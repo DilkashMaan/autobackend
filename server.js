@@ -171,22 +171,54 @@ const io = new Server(server, {
 
 const users = {};
 const busyUsers = new Set();
+const availableUsers = [];
 
 function getEmailBySocketId(socketId) {
   return Object.keys(users).find(email => users[email] === socketId);
 }
+
+function matchUsers() {
+  while (availableUsers.length >= 2) {
+    const user1 = availableUsers.shift();
+    const user2 = availableUsers.shift();
+
+    const socket1 = users[user1];
+    const socket2 = users[user2];
+
+    if (socket1 && socket2) {
+      busyUsers.add(user1);
+      busyUsers.add(user2);
+
+      // Send incoming call to both
+      io.to(socket1).emit("incoming:call", { from: user2 });
+      io.to(socket2).emit("incoming:call", { from: user1 });
+    }
+  }
+}
+
+function getAvailableUserList() {
+  return Object.keys(users)
+    .filter(email => !busyUsers.has(email))
+    .map(email => ({ email }));
+}
+
 
 io.on("connection", (socket) => {
   console.log("🔌 New connection:", socket.id);
 
   socket.on("user:online", ({ email }) => {
     users[email] = socket.id;
+
+    if (!busyUsers.has(email) && !availableUsers.includes(email)) {
+      availableUsers.push(email);
+    }
+
     console.log(`✅ ${email} is online as ${socket.id}`);
-    io.emit("online:users", Object.keys(users)
-      .filter(email => !busyUsers.has(email))
-      .map(email => ({ email }))
-    );
+
+    io.emit("online:users", getAvailableUserList());
+    matchUsers(); // Try pairing users
   });
+
 
   socket.on("user:call", ({ to, offer }) => {
     const fromEmail = getEmailBySocketId(socket.id);
@@ -244,15 +276,21 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     const email = getEmailBySocketId(socket.id);
+
     if (email) {
       delete users[email];
       busyUsers.delete(email);
-      io.emit("online:users", Object.keys(users)
-        .filter(email => !busyUsers.has(email))
-        .map(email => ({ email }))
-      );
+
+      const index = availableUsers.indexOf(email);
+      if (index !== -1) {
+        availableUsers.splice(index, 1);
+      }
+
+      io.emit("online:users", getAvailableUserList());
+      matchUsers(); // Optional: try matching again
     }
   });
+
 });
 
 // Start server
