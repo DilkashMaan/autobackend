@@ -85,11 +85,21 @@ io.on("connection", (socket) => {
   socket.on("call:accepted", ({ to, ans }) => {
     const targetSocketId = users[to];
     const fromEmail = getEmailBySocketId(socket.id);
+
     console.log(`✅ ${fromEmail} accepted call from ${to}`);
+
     if (targetSocketId) {
       io.to(targetSocketId).emit("call:accepted", { ans });
+
+      // ✅ Remove both users from the `users` object
+      delete users[fromEmail];
+      delete users[to];
+
+      // ✅ Update the online users for everyone
+      io.emit("online:users", Object.keys(users).map(email => ({ email })));
     }
   });
+
 
   socket.on("peer:nego:needed", ({ to, offer }) => {
     const targetSocketId = users[to];
