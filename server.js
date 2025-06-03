@@ -125,6 +125,7 @@ import pkg from 'pg';
 const { Pool } = pkg;
 import cors from 'cors';
 import dotenv from 'dotenv';
+import authRoutes from './routes/auth.js';
 import http from 'http';
 import { Server } from 'socket.io';
 
