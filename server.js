@@ -265,14 +265,17 @@ io.on("connection", (socket) => {
 
   socket.on("call:ended", ({ to }) => {
     const fromEmail = getEmailBySocketId(socket.id);
+
     busyUsers.delete(fromEmail);
     busyUsers.delete(to);
 
-    io.emit("online:users", Object.keys(users)
-      .filter(email => !busyUsers.has(email))
-      .map(email => ({ email }))
-    );
+    if (!availableUsers.includes(fromEmail)) availableUsers.push(fromEmail);
+    if (!availableUsers.includes(to)) availableUsers.push(to);
+
+    io.emit("online:users", getAvailableUserList());
+    matchUsers(); // Try to match again
   });
+
 
   socket.on("disconnect", () => {
     const email = getEmailBySocketId(socket.id);
