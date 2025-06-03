@@ -47,7 +47,8 @@ const io = new Server(server, {
   }
 });
 
-const users = {};
+const users = {}; // email -> socket.id
+const waitingQueue = [];
 const emailToSocketIdMap = new Map();
 const socketIdToEmailMap = new Map();
 
@@ -72,6 +73,31 @@ io.on("connection", (socket) => {
     console.log(`✅ ${email} is online as ${socket.id}`);
     io.emit("online:users", Object.keys(users).map(email => ({ email })));
   });
+
+  socket.on("user:ready", ({ email }) => {
+    users[email] = socket.id;
+    waitingQueue.push({ email, socketId: socket.id });
+    console.log(`🕒 ${email} added to waiting queue.`);
+
+    // Try pairing users
+    while (waitingQueue.length >= 2) {
+      const user1 = waitingQueue.shift();
+      const user2 = waitingQueue.shift();
+
+      console.log(`🔗 Pairing ${user1.email} with ${user2.email}`);
+
+      io.to(user1.socketId).emit("matched:pair", { peer: user2.email, peerSocketId: user2.socketId });
+      io.to(user2.socketId).emit("matched:pair", { peer: user1.email, peerSocketId: user1.socketId });
+
+      // Remove paired users from online list
+      delete users[user1.email];
+      delete users[user2.email];
+
+      // Update global user list
+      io.emit("online:users", Object.keys(users).map(email => ({ email })));
+    }
+  });
+
 
   socket.on("user:call", ({ to, offer }) => {
     const targetSocketId = users[to];
@@ -118,11 +144,20 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     const email = getEmailBySocketId(socket.id);
     console.log(`❌ Disconnected: ${email || socket.id}`);
+
     if (email) {
       delete users[email];
+
+      // ❌ Remove from waiting queue if they were waiting
+      const index = waitingQueue.findIndex(user => user.email === email);
+      if (index !== -1) {
+        waitingQueue.splice(index, 1);
+      }
+
       io.emit("online:users", Object.keys(users).map(email => ({ email })));
     }
   });
+
 });
 
 // Start server
