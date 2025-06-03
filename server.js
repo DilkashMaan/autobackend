@@ -179,8 +179,8 @@ function getEmailBySocketId(socketId) {
 
 function matchUsers() {
   while (availableUsers.length >= 2) {
-    const user1 = availableUsers.shift();
-    const user2 = availableUsers.shift();
+    const user1 = availableUsers.pop();
+    const user2 = availableUsers.pop();
 
     const socket1 = users[user1];
     const socket2 = users[user2];
