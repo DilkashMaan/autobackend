@@ -50,7 +50,9 @@ const io = new Server(server, {
 const users = {}; // email -> socket.id
 const waitingQueue = [];
 const emailToSocketIdMap = new Map();
-const socketIdToEmailMap = new Map();
+const inCallUsers = new Set();
+
+
 
 app.get('/api/online-users', (req, res) => {
   const onlineUsers = Array.from(emailToSocketIdMap.keys());
@@ -75,26 +77,34 @@ io.on("connection", (socket) => {
   });
 
   socket.on("user:ready", ({ email }) => {
+    if (inCallUsers.has(email)) return;
     users[email] = socket.id;
     waitingQueue.push({ email, socketId: socket.id });
     console.log(`🕒 ${email} added to waiting queue.`);
+    const alreadyInQueue = waitingQueue.find(u => u.email === email);
+    if (!alreadyInQueue) {
+      waitingQueue.push({ email, socketId: socket.id });
+      console.log(`🕒 ${email} added to waiting queue.`);
+    }
 
     // Try pairing users
     while (waitingQueue.length >= 2) {
       const user1 = waitingQueue.shift();
       const user2 = waitingQueue.shift();
-
+      if (inCallUsers.has(user1.email) || inCallUsers.has(user2.email)) continue;
+      inCallUsers.add(user1.email);
+      inCallUsers.add(user2.email);
       console.log(`🔗 Pairing ${user1.email} with ${user2.email}`);
 
       io.to(user1.socketId).emit("matched:pair", { peer: user2.email, peerSocketId: user2.socketId });
       io.to(user2.socketId).emit("matched:pair", { peer: user1.email, peerSocketId: user1.socketId });
 
       // Remove paired users from online list
-      delete users[user1.email];
-      delete users[user2.email];
+      // delete users[user1.email];
+      // delete users[user2.email];
 
-      // Update global user list
-      io.emit("online:users", Object.keys(users).map(email => ({ email })));
+      // // Update global user list
+      // io.emit("online:users", Object.keys(users).map(email => ({ email })));
     }
   });
 
