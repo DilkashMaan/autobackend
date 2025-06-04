@@ -181,6 +181,10 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on('user:leave',()=>{
+    console.log(`User left ${socket.id}`)
+  })
+
 
   socket.on("peer:nego:needed", ({ to, offer }) => {
     const targetSocketId = users[to];
