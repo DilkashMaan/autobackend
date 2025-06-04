@@ -313,7 +313,7 @@ io.on("connection", (socket) => {
     users[email] = socket.id;
     console.log(`✅ ${email} is online as ${socket.id}`);
     io.emit("online:users", Object.keys(users).map(email => ({ email })));
-    pairUsers();
+
   });
 
   socket.on("user:ready", ({ email }) => {
@@ -327,7 +327,9 @@ io.on("connection", (socket) => {
       console.log(`🕒 ${email} added to waiting queue.`);
     }
 
-    pairUsers();
+    if (waitingQueue.length >= 2) {
+      pairUsers();
+    }
   });
 
   socket.on("user:call", ({ to, offer }) => {
