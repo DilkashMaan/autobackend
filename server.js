@@ -328,7 +328,9 @@ io.on("connection", (socket) => {
     }
 
     if (waitingQueue.length >= 2) {
-      pairUsers();
+      setInterval(() => {
+        pairUsers();
+      }, 2000)
     }
   });
 
