@@ -49,6 +49,8 @@ const io = new Server(server, {
 
 const users = {}; // email -> socket.id
 const waitingQueue = [];
+const userStatus = new Map();  // email -> 'available' or 'busy'
+
 const totalUsers = new Set(); // Track total users
 const emailToSocketIdMap = new Map();
 const socketIdToEmailMap = new Map();
@@ -100,122 +102,128 @@ function getEmailBySocketId(socketId) {
 //     }
 //   });
 
+socket.on("user:online", ({ email }) => {
+  users[email] = socket.id;
+  totalUsers.add(email);
+  userStatus.set(email, 'available');  // mark user as available on connect
+  io.emit("online:users", Array.from(totalUsers).map(email => ({ email, status: userStatus.get(email) })));
+});
+
+socket.on("user:ready", ({ email }) => {
+  users[email] = socket.id;
+  if (!totalUsers.has(email)) totalUsers.add(email);
+  if (!userStatus.has(email)) userStatus.set(email, 'available');
+
+  if (userStatus.get(email) === 'available' && !waitingQueue.find(u => u.email === email)) {
+    waitingQueue.push({ email, socketId: socket.id });
+    console.log(`🕒 ${email} added to waiting queue.`);
+  }
+
+  while (waitingQueue.length >= 2) {
+    const user1 = waitingQueue.shift();
+    const user2 = waitingQueue.shift();
+
+    userStatus.set(user1.email, 'busy');
+    userStatus.set(user2.email, 'busy');
+
+    io.to(user1.socketId).emit("matched:pair", { peer: user2.email, peerSocketId: user2.socketId });
+    io.to(user2.socketId).emit("matched:pair", { peer: user1.email, peerSocketId: user1.socketId });
+
+    console.log(`🔗 Pairing ${user1.email} with ${user2.email}`);
+
+    io.emit("online:users", Array.from(totalUsers).map(email => ({ email, status: userStatus.get(email) })));
+  }
+
+  fillWaitingQueue();
+});
+
+
+
+socket.on("user:free", ({ email }) => {
+  if (userStatus.has(email)) {
+    userStatus.set(email, 'available');
+    if (!waitingQueue.find(u => u.email === email)) {
+      waitingQueue.push({ email, socketId: users[email] });
+      console.log(`🔄 ${email} is now free and added to waiting queue.`);
+    }
+    io.emit("online:users", Array.from(totalUsers).map(email => ({ email, status: userStatus.get(email) })));
+    fillWaitingQueue();
+  }
+});
+
+
 function fillWaitingQueue() {
-  // While queue has fewer than 2 users, add from totalUsers (if available)
-  while (waitingQueue.length < 2 && totalUsers.size > 0) {
-    // Find a user in totalUsers who is NOT already in waitingQueue
-    const userToAdd = Array.from(totalUsers).find(email => !waitingQueue.find(u => u.email === email));
-    if (!userToAdd) break; // no more users to add
+  while (waitingQueue.length < 2) {
+    // find first user who is 'available' and not in waitingQueue
+    const userToAdd = Array.from(totalUsers).find(email => {
+      return userStatus.get(email) === 'available' && !waitingQueue.find(u => u.email === email);
+    });
+    if (!userToAdd) break;
 
     waitingQueue.push({ email: userToAdd, socketId: users[userToAdd] });
     console.log(`🕒 Auto-added ${userToAdd} to waiting queue.`);
   }
 }
-io.on("connection", (socket) => {
-  console.log("🔌 New connection:", socket.id);
 
-  socket.on("user:online", ({ email }) => {
-    users[email] = socket.id;
-    totalUsers.add(email);  // Add user to totalUsers set
-    console.log(`✅ ${email} is online as ${socket.id}`);
-    io.emit("online:users", Array.from(totalUsers).map(email => ({ email })));
-  });
 
-  socket.on("user:ready", ({ email }) => {
-    // Add user to users map & totalUsers if not present
-    users[email] = socket.id;
-    if (!totalUsers.has(email)) {
-      totalUsers.add(email);
+socket.on("user:call", ({ to, offer }) => {
+  const targetSocketId = users[to];
+  const fromEmail = getEmailBySocketId(socket.id);
+  console.log(`📞 ${fromEmail} is calling ${to}`);
+  if (targetSocketId) {
+    io.to(targetSocketId).emit("incoming:call", { from: fromEmail, offer });
+  }
+});
+
+socket.on("call:accepted", ({ to, ans }) => {
+  const targetSocketId = users[to];
+  const fromEmail = getEmailBySocketId(socket.id);
+
+  console.log(`✅ ${fromEmail} accepted call from ${to}`);
+
+  if (targetSocketId) {
+    io.to(targetSocketId).emit("call:accepted", { ans });
+
+    // ✅ Remove both users from the `users` object
+    delete users[fromEmail];
+    delete users[to];
+
+    // ✅ Update the online users for everyone
+    io.emit("online:users", Object.keys(users).map(email => ({ email })));
+  }
+});
+
+
+socket.on("peer:nego:needed", ({ to, offer }) => {
+  const targetSocketId = users[to];
+  if (targetSocketId) {
+    io.to(targetSocketId).emit("peer:nego:needed", { from: getEmailBySocketId(socket.id), offer });
+  }
+});
+
+socket.on("peer:nego:done", ({ to, ans }) => {
+  const targetSocketId = users[to];
+  if (targetSocketId) {
+    io.to(targetSocketId).emit("peer:nego:final", { ans });
+  }
+});
+
+socket.on("disconnect", () => {
+  const email = getEmailBySocketId(socket.id);
+  console.log(`❌ Disconnected: ${email || socket.id}`);
+
+  if (email) {
+    delete users[email];
+
+    // ❌ Remove from waiting queue if they were waiting
+    const index = waitingQueue.findIndex(user => user.email === email);
+    if (index !== -1) {
+      waitingQueue.splice(index, 1);
     }
 
-    // If queue already contains the user, don't add again
-    if (!waitingQueue.find(u => u.email === email)) {
-      waitingQueue.push({ email, socketId: socket.id });
-      console.log(`🕒 ${email} added to waiting queue.`);
-    }
-
-    // While we have 2 or more users in the queue, pair them
-    while (waitingQueue.length >= 2) {
-      const user1 = waitingQueue.shift();
-      const user2 = waitingQueue.shift();
-
-      console.log(`🔗 Pairing ${user1.email} with ${user2.email}`);
-
-      // Notify the paired users
-      io.to(user1.socketId).emit("matched:pair", { peer: user2.email, peerSocketId: user2.socketId });
-      io.to(user2.socketId).emit("matched:pair", { peer: user1.email, peerSocketId: user1.socketId });
-
-      // Remove paired users from totalUsers and users map
-      totalUsers.delete(user1.email);
-      totalUsers.delete(user2.email);
-      delete users[user1.email];
-      delete users[user2.email];
-
-      // Broadcast updated online users
-      io.emit("online:users", Array.from(totalUsers).map(email => ({ email })));
-    }
-    fillWaitingQueue();
-  });
-
-
-  socket.on("user:call", ({ to, offer }) => {
-    const targetSocketId = users[to];
-    const fromEmail = getEmailBySocketId(socket.id);
-    console.log(`📞 ${fromEmail} is calling ${to}`);
-    if (targetSocketId) {
-      io.to(targetSocketId).emit("incoming:call", { from: fromEmail, offer });
-    }
-  });
-
-  socket.on("call:accepted", ({ to, ans }) => {
-    const targetSocketId = users[to];
-    const fromEmail = getEmailBySocketId(socket.id);
-
-    console.log(`✅ ${fromEmail} accepted call from ${to}`);
-
-    if (targetSocketId) {
-      io.to(targetSocketId).emit("call:accepted", { ans });
-
-      // ✅ Remove both users from the `users` object
-      delete users[fromEmail];
-      delete users[to];
-
-      // ✅ Update the online users for everyone
-      io.emit("online:users", Object.keys(users).map(email => ({ email })));
-    }
-  });
-
-
-  socket.on("peer:nego:needed", ({ to, offer }) => {
-    const targetSocketId = users[to];
-    if (targetSocketId) {
-      io.to(targetSocketId).emit("peer:nego:needed", { from: getEmailBySocketId(socket.id), offer });
-    }
-  });
-
-  socket.on("peer:nego:done", ({ to, ans }) => {
-    const targetSocketId = users[to];
-    if (targetSocketId) {
-      io.to(targetSocketId).emit("peer:nego:final", { ans });
-    }
-  });
-
-  socket.on("disconnect", () => {
-    const email = getEmailBySocketId(socket.id);
-    console.log(`❌ Disconnected: ${email || socket.id}`);
-
-    if (email) {
-      delete users[email];
-
-      // ❌ Remove from waiting queue if they were waiting
-      const index = waitingQueue.findIndex(user => user.email === email);
-      if (index !== -1) {
-        waitingQueue.splice(index, 1);
-      }
-
-      io.emit("online:users", Object.keys(users).map(email => ({ email })));
-    }
-  });
+    io.emit("online:users", Object.keys(users).map(email => ({ email })));
+  }
+});
 
 });
 
