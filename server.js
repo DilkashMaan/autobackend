@@ -269,6 +269,7 @@ const users = {}; // email -> socket.id
 const waitingQueue = [];
 const emailToSocketIdMap = new Map();
 const inCallUsers = new Set();
+const connectingUsers = new Set();
 
 app.get('/api/online-users', (req, res) => {
   const onlineUsers = Array.from(emailToSocketIdMap.keys());
@@ -284,14 +285,21 @@ function getEmailBySocketId(socketId) {
 }
 
 function pairUsers() {
+  const availableUsers = waitingQueue.filter(u =>
+    !inCallUsers.has(u.email) && !connectingUsers.has(u.email)
+  );
+
+  // Clear queue and refill with only available users
+  waitingQueue.length = 0;
+  waitingQueue.push(...availableUsers);
+
   while (waitingQueue.length >= 2) {
     const user1 = waitingQueue.shift();
     const user2 = waitingQueue.shift();
 
-    if (!user1 || !user2) return;
-
-    inCallUsers.add(user1.email);
-    inCallUsers.add(user2.email);
+    // Mark as connecting
+    connectingUsers.add(user1.email);
+    connectingUsers.add(user2.email);
 
     console.log(`🔗 Pairing ${user1.email} with ${user2.email}`);
 
@@ -329,9 +337,9 @@ io.on("connection", (socket) => {
       console.log(`🕒 ${email} added to waiting queue.`);
     }
 
-    while (waitingQueue.length >= 2) {
-      pairUsers();
-    }
+
+    pairUsers();
+
   });
 
   socket.on("user:call", ({ to, offer }) => {
