@@ -313,6 +313,7 @@ io.on("connection", (socket) => {
     users[email] = socket.id;
     console.log(`✅ ${email} is online as ${socket.id}`);
     io.emit("online:users", Object.keys(users).map(email => ({ email })));
+    pairUsers();
   });
 
   socket.on("user:ready", ({ email }) => {
