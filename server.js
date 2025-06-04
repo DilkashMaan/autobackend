@@ -284,27 +284,29 @@ function getEmailBySocketId(socketId) {
 }
 
 function pairUsers() {
-  // Filter out users in call
-  const availableUsers = waitingQueue.filter(u => !inCallUsers.has(u.email));
-
-  // Clear queue and refill with only available users
-  waitingQueue.length = 0;
-  waitingQueue.push(...availableUsers);
-
-  // While we have at least 2 users, pair them
   while (waitingQueue.length >= 2) {
     const user1 = waitingQueue.shift();
     const user2 = waitingQueue.shift();
+
+    if (!user1 || !user2) return;
 
     inCallUsers.add(user1.email);
     inCallUsers.add(user2.email);
 
     console.log(`🔗 Pairing ${user1.email} with ${user2.email}`);
 
-    io.to(user1.socketId).emit("matched:pair", { peer: user2.email, peerSocketId: user2.socketId });
-    io.to(user2.socketId).emit("matched:pair", { peer: user1.email, peerSocketId: user1.socketId });
+    io.to(user1.socketId).emit("matched:pair", {
+      peer: user2.email,
+      peerSocketId: user2.socketId,
+    });
+
+    io.to(user2.socketId).emit("matched:pair", {
+      peer: user1.email,
+      peerSocketId: user1.socketId,
+    });
   }
 }
+
 
 io.on("connection", (socket) => {
   console.log("🔌 New connection:", socket.id);
@@ -353,6 +355,9 @@ io.on("connection", (socket) => {
       // ✅ Remove both users from the `users` object
       delete users[fromEmail];
       delete users[to];
+
+      inCallUsers.delete(fromEmail);
+      inCallUsers.delete(to);
 
       // ✅ Update the online users for everyone
       io.emit("online:users", Object.keys(users).map(email => ({ email })));
