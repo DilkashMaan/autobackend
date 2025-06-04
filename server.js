@@ -46,7 +46,7 @@ const io = new Server(server, {
     methods: ["GET", "POST"]
   }
 });
-let activeQueue = [];
+
 const users = {}; // email -> socket.id
 const waitingQueue = [];
 const emailToSocketIdMap = new Map();
@@ -65,50 +65,13 @@ function getEmailBySocketId(socketId) {
   return Object.keys(users).find(email => users[email] === socketId);
 }
 
-function tryToMatchUsers() {
-  // Only match if no one is currently matched
-  if (activeQueue.length === 0 && waitingQueue.length >= 2) {
-    const [user1, user2] = [waitingQueue.shift(), waitingQueue.shift()];
-    activeQueue = [user1, user2];
-
-    // Send each other as online
-    user1.emit('online:users', [{ email: user2.email }]);
-    user2.emit('online:users', [{ email: user1.email }]);
-  }
-}
-
 io.on("connection", (socket) => {
   console.log("🔌 New connection:", socket.id);
 
-  // socket.on("user:online", ({ email }) => {
-  //   users[email] = socket.id;
-  //   console.log(`✅ ${email} is online as ${socket.id}`);
-  //   io.emit("online:users", Object.keys(users).map(email => ({ email })));
-  // });
-
-  socket.on('user:online', ({ email }) => {
-    socket.email = email;
-
-    // Avoid duplicate entry
-    if (!waitingQueue.find(s => s.email === email) &&
-      !activeQueue.find(s => s.email === email)) {
-      waitingQueue.push(socket);
-    }
-
-    tryToMatchUsers();
-  });
-
-
-  socket.on('user:leave', ({ email, secondUser }) => {
-    // Remove from activeQueue
-    activeQueue = activeQueue.filter(s => s.email !== email && s.email !== secondUser);
-
-    // Re-add to waitingQueue if still connected
-    if (socket.connected) {
-      waitingQueue.push(socket);
-    }
-
-    tryToMatchUsers();
+  socket.on("user:online", ({ email }) => {
+    users[email] = socket.id;
+    console.log(`✅ ${email} is online as ${socket.id}`);
+    io.emit("online:users", Object.keys(users).map(email => ({ email })));
   });
 
   socket.on("user:ready", ({ email }) => {
