@@ -66,6 +66,15 @@ function getEmailBySocketId(socketId) {
   return Object.keys(users).find(email => users[email] === socketId);
 }
 
+function broadcastAvailableUsers() {
+  const queuedEmails = waitingQueue.map(u => u.email);
+  const availableUsers = Object.keys(users)
+    .filter(email => !queuedEmails.includes(email))
+    .map(email => ({ email }));
+
+  io.emit("online:users", availableUsers);
+}
+
 io.on("connection", (socket) => {
   console.log("🔌 New connection:", socket.id);
 
@@ -127,7 +136,7 @@ io.on("connection", (socket) => {
       delete users[user2.email];
 
       // Emit updated online list
-      io.emit("online:users", Object.keys(users).map(email => ({ email })));
+      broadcastAvailableUsers();
     }
   });
 
@@ -168,7 +177,7 @@ io.on("connection", (socket) => {
       delete users[to];
 
       // ✅ Update the online users for everyone
-      io.emit("online:users", Object.keys(users).map(email => ({ email })));
+      broadcastAvailableUsers();
     }
   });
 
@@ -200,7 +209,7 @@ io.on("connection", (socket) => {
         waitingQueue.splice(index, 1);
       }
 
-      io.emit("online:users", Object.keys(users).map(email => ({ email })));
+      broadcastAvailableUsers()
     }
   });
 
