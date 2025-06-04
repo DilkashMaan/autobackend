@@ -225,7 +225,7 @@ socket.on("disconnect", () => {
   }
 });
 
-});
+
 
 // Start server
 const PORT = process.env.PORT || 5000;
