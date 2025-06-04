@@ -327,10 +327,8 @@ io.on("connection", (socket) => {
       console.log(`🕒 ${email} added to waiting queue.`);
     }
 
-    if (waitingQueue.length >= 2) {
-      setInterval(() => {
-        pairUsers();
-      }, 2000)
+    while (waitingQueue.length >= 2) {
+      pairUsers();
     }
   });
 
