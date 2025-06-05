@@ -264,7 +264,7 @@ const io = new Server(server, {
     methods: ["GET", "POST"]
   }
 });
-
+let isPairingInProgress = false;
 const users = {}; // email -> socket.id
 const waitingQueue = [];
 const emailToSocketIdMap = new Map();
@@ -285,6 +285,9 @@ function getEmailBySocketId(socketId) {
 }
 
 function pairUsers() {
+
+  if (isPairingInProgress) return;
+  isPairingInProgress = true;
   const availableUsers = waitingQueue.filter(u =>
     !inCallUsers.has(u.email) && !connectingUsers.has(u.email)
   );
@@ -313,6 +316,7 @@ function pairUsers() {
       peerSocketId: user1.socketId,
     });
   }
+  isPairingInProgress = false;
 }
 
 
@@ -361,8 +365,8 @@ io.on("connection", (socket) => {
       io.to(targetSocketId).emit("call:accepted", { ans });
 
       // ✅ Remove both users from the `users` object
-      delete users[fromEmail];
-      delete users[to];
+      // delete users[fromEmail];
+      // delete users[to];
 
       inCallUsers.delete(fromEmail);
       inCallUsers.delete(to);
