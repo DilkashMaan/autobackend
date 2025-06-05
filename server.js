@@ -311,10 +311,13 @@ function pairUsers() {
       peerSocketId: user2.socketId,
     });
 
-    io.to(user2.socketId).emit("matched:pair", {
-      peer: user1.email,
-      peerSocketId: user1.socketId,
-    });
+    setTimeout(() => {
+      io.to(user2.socketId).emit("matched:pair", {
+        peer: user1.email,
+        peerSocketId: user1.socketId,
+        delay: true // 👈 Add delay flag
+      });
+    }, 7000); // 7-second delay
   }
   isPairingInProgress = false;
 }
