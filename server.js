@@ -573,30 +573,81 @@ io.on("connection", (socket) => {
   });
 
   socket.on("user:call", ({ to, offer }) => {
+    // const targetSocketId = users[to];
+    // const fromEmail = getEmailBySocketId(socket.id);
+    // console.log(`📞 ${fromEmail} is calling ${to}`);
+    // if (targetSocketId) {
+    //   io.to(targetSocketId).emit("incoming:call", { from: fromEmail, offer });
+    // }
     const targetSocketId = users[to];
     const fromEmail = getEmailBySocketId(socket.id);
+
+    if (!targetSocketId || !fromEmail) return;
+
     console.log(`📞 ${fromEmail} is calling ${to}`);
-    if (targetSocketId) {
-      io.to(targetSocketId).emit("incoming:call", { from: fromEmail, offer });
-    }
+    io.to(targetSocketId).emit("incoming:call", { from: fromEmail, offer });
+
+    // ⏰ Add timeout for unanswered call
+    const timeout = setTimeout(() => {
+      console.log(`⏰ Call between ${fromEmail} and ${to} timed out`);
+
+      // Cleanup and requeue both users
+      connectingUsers.delete(fromEmail);
+      connectingUsers.delete(to);
+
+      const fromSocketId = users[fromEmail];
+      const toSocketIdNow = users[to]; // Might have changed
+
+      if (fromSocketId) waitingQueue.push({ email: fromEmail, socketId: fromSocketId });
+      if (toSocketIdNow) waitingQueue.push({ email: to, socketId: toSocketIdNow });
+
+      io.to(fromSocketId).emit("call:timeout", { peer: to });
+      if (toSocketIdNow) io.to(toSocketIdNow).emit("call:timeout", { peer: fromEmail });
+
+      pairUsers(); // Retry pairing
+    }, 20000); // 20s timeout
+
+    // Store timeout reference so it can be cleared if accepted
+    socket.callTimeout = timeout;
+
   });
 
   socket.on("call:accepted", ({ to, ans }) => {
+    // const targetSocketId = users[to];
+    // const fromEmail = getEmailBySocketId(socket.id);
+
+    // console.log(`✅ ${fromEmail} accepted call from ${to}`);
+
+    // if (targetSocketId) {
+    //   io.to(targetSocketId).emit("call:accepted", { ans });
+
+    //   delete users[fromEmail];
+    //   delete users[to];
+
+    //   inCallUsers.delete(fromEmail);
+    //   inCallUsers.delete(to);
+    //   connectingUsers.delete(fromEmail);
+    //   connectingUsers.delete(to);
+
+    //   io.emit("online:users", Object.keys(users).map(email => ({ email })));
+    //   pairUsers();
+    // }
+
     const targetSocketId = users[to];
     const fromEmail = getEmailBySocketId(socket.id);
-
-    console.log(`✅ ${fromEmail} accepted call from ${to}`);
 
     if (targetSocketId) {
       io.to(targetSocketId).emit("call:accepted", { ans });
 
-      delete users[fromEmail];
-      delete users[to];
-
-      inCallUsers.delete(fromEmail);
-      inCallUsers.delete(to);
+      // ✅ Cleanup on success
+      clearTimeout(socket.callTimeout);
       connectingUsers.delete(fromEmail);
       connectingUsers.delete(to);
+      inCallUsers.add(fromEmail);
+      inCallUsers.add(to);
+
+      delete users[fromEmail];
+      delete users[to];
 
       io.emit("online:users", Object.keys(users).map(email => ({ email })));
       pairUsers();
