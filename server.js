@@ -605,11 +605,15 @@ io.on("connection", (socket) => {
 
   socket.on("user:leave", ({ email, secondUser }) => {
     console.log(`⏩ ${email} skipped ${secondUser}`);
+    const email = getEmailBySocketId(socket.id);
+    if (email) {
+      delete users[email];
+      inCallUsers.delete(email);
+      inCallUsers.delete(secondUser);
+      connectingUsers.delete(email);
+      connectingUsers.delete(secondUser);
 
-    inCallUsers.delete(email);
-    inCallUsers.delete(secondUser);
-    connectingUsers.delete(email);
-    connectingUsers.delete(secondUser);
+    }
 
     if (!waitingQueue.find(u => u.email === email)) {
       waitingQueue.push({ email, socketId: socket.id });
