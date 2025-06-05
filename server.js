@@ -364,9 +364,9 @@ io.on("connection", (socket) => {
     if (targetSocketId) {
       io.to(targetSocketId).emit("call:accepted", { ans });
 
-      // ✅ Remove both users from the `users` object
-      // delete users[fromEmail];
-      // delete users[to];
+      //✅ Remove both users from the `users` object
+      delete users[fromEmail];
+      delete users[to];
 
       inCallUsers.delete(fromEmail);
       inCallUsers.delete(to);
