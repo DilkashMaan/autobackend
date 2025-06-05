@@ -482,6 +482,8 @@ const io = new Server(server, {
 });
 
 let isPairingInProgress = false;
+const userSkipCounts = new Map(); // email -> { count, lastSkippedAt }
+
 const users = {}; // email -> socket.id
 const waitingQueue = [];
 const emailToSocketIdMap = new Map();
@@ -654,8 +656,40 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("send-message", ({ text }) => {
+    const senderEmail = emailMap[socket.id];
+    const peerSocketId = userSocketMap[pairs[senderEmail]];
+
+    if (peerSocketId) {
+      io.to(peerSocketId).emit("receive-message", {
+        sender: senderEmail,
+        text,
+        time: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      });
+    }
+  });
+
   socket.on("user:leave", ({ email, secondUser }) => {
-    console.log(`⏩ ${email} skipped ${secondUser}`);
+    const now = Date.now();
+    const skipData = userSkipCounts.get(email) || { count: 0, lastSkippedAt: 0 };
+
+    if (now - skipData.lastSkippedAt > 10 * 60 * 1000) {
+      skipData.count = 0;
+    }
+    if (skipData.count >= 5) {
+      socket.emit("skip:disabled", { cooldown: 10 * 60 }); // 10 minutes in seconds
+      return;
+    }
+
+    skipData.count++;
+    skipData.lastSkippedAt = now;
+    userSkipCounts.set(email, skipData);
+
+    console.log(`⏩ ${email} skipped ${secondUser} (${skipData.count} skips)`);
+    // console.log(`⏩ ${email} skipped ${secondUser}`);
 
     if (email) {
       delete users[email];
