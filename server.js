@@ -373,6 +373,7 @@ io.on("connection", (socket) => {
 
       // ✅ Update the online users for everyone
       io.emit("online:users", Object.keys(users).map(email => ({ email })));
+      pairUsers();
     }
   });
 
