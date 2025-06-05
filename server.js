@@ -686,6 +686,7 @@ io.on("connection", (socket) => {
   // });
   socket.on('send-message', data => {
     const targetSocketId = userSocketMap[data.to];
+    console.log("message from partnernnnn", data.to)
     if (targetSocketId) {
       io.to(targetSocketId).emit('receive-message', data);
     }
