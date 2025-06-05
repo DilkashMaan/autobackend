@@ -667,19 +667,21 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("send-message", ({ text }) => {
-    const senderEmail = emailMap[socket.id];
-    const peerSocketId = userSocketMap[pairs[senderEmail]];
+  socket.on("send-message", ({ text, to }) => {
+    const from = emailMap[socket.id];
+    const peerSocketId = userSocketMap[to]; // Use recipient email
 
     if (peerSocketId) {
       io.to(peerSocketId).emit("receive-message", {
-        sender: senderEmail,
+        sender: from,
         text,
         time: new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
         }),
       });
+    } else {
+      console.log(`No socket found for ${to}`);
     }
   });
 
