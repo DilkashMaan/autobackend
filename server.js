@@ -682,9 +682,6 @@ io.on("connection", (socket) => {
       });
     }
   });
-  socket.on("get:onlineUsers", () => {
-    io.emit("online:users", [...connectedUsers]);
-  });
 
   socket.on("user:leave", ({ email, secondUser }) => {
     const now = Date.now();
