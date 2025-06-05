@@ -489,6 +489,9 @@ const waitingQueue = [];
 const emailToSocketIdMap = new Map();
 const inCallUsers = new Set();
 const connectingUsers = new Set();
+const emailMap = {};       // socket.id => email
+const userSocketMap = {};  // email => socket.id
+const pairs = {};
 
 app.get('/api/online-users', (req, res) => {
   const onlineUsers = Array.from(emailToSocketIdMap.keys());
@@ -522,6 +525,14 @@ function pairUsers() {
     connectingUsers.add(user2.email);
     inCallUsers.add(user1.email);
     inCallUsers.add(user2.email);
+    pairs[user1.email] = user2.email;
+    pairs[user2.email] = user1.email;
+
+    emailMap[user1.socketId] = user1.email;
+    emailMap[user2.socketId] = user2.email;
+
+    userSocketMap[user1.email] = user1.socketId;
+    userSocketMap[user2.email] = user2.socketId;
 
     console.log(`🔗 Pairing ${user1.email} with ${user2.email}`);
 
