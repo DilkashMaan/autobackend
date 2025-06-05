@@ -377,6 +377,22 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("user:leave", ({ email, secondUser }) => {
+    console.log(`⏩ ${email} skipped ${secondUser}`);
+
+    // Clean up in-call users
+    inCallUsers.delete(email);
+    inCallUsers.delete(secondUser);
+
+    // Re-add the skipping user to the queue
+    if (!waitingQueue.find(u => u.email === email)) {
+      waitingQueue.push({ email, socketId: socket.id });
+    }
+
+    pairUsers();
+  });
+
+
   socket.on("peer:nego:needed", ({ to, offer }) => {
     const targetSocketId = users[to];
     if (targetSocketId) {
