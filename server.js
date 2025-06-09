@@ -819,52 +819,71 @@ async function isBlocked(user1, user2, db) {
   return result.rowCount > 0;
 }
 async function pairUsers() {
-  if (isPairingInProgress || waitingQueue.length < 2) return;
-  isPairingInProgress = true;
+  if (waitingQueue.length < 2) return;
+
   const availableUsers = waitingQueue.filter(u =>
     !inCallUsers.has(u.email) && !connectingUsers.has(u.email)
   );
-  waitingQueue.length = 0;
+
+  waitingQueue.length = 0; // Clear queue, will repopulate below
   waitingQueue.push(...availableUsers);
+
   while (waitingQueue.length >= 2) {
     const user1 = waitingQueue.shift();
     let user2 = null;
+
     for (let i = 0; i < waitingQueue.length; i++) {
       if (!(await isBlocked(user1.email, waitingQueue[i].email, pool))) {
         user2 = waitingQueue.splice(i, 1)[0];
         break;
       }
     }
+
     if (!user2) {
-      waitingQueue.unshift(user1); // Put user1 back in queue
+      // Couldn't find a match for user1, requeue them
+      waitingQueue.unshift(user1);
       break;
     }
+
+    // Continue pairing user1 and user2
     if (user1.email === user2.email) continue;
+
+    // Mark both as busy
     connectingUsers.add(user1.email);
     connectingUsers.add(user2.email);
     inCallUsers.add(user1.email);
     inCallUsers.add(user2.email);
+
+    // Save pairing info
     pairs[user1.email] = user2.email;
     pairs[user2.email] = user1.email;
-    emailMap[user1.socketId] = user1.email;
-    emailMap[user2.socketId] = user2.email;
+
+    // Save mapping
+    emailMap[user1.socketId] = { email: user1.email, time: Date.now() };
+    emailMap[user2.socketId] = { email: user2.email, time: Date.now() + 7000 }; // Delayed
+
     userSocketMap[user1.email] = user1.socketId;
     userSocketMap[user2.email] = user2.socketId;
+
     console.log(`🔗 Pairing ${user1.email} with ${user2.email}`);
+
+    // Send to initiator
     io.to(user1.socketId).emit("matched:pair", {
       peer: user2.email,
       peerSocketId: user2.socketId,
     });
+
+    // Send to delay peer after 7s
     setTimeout(() => {
       io.to(user2.socketId).emit("matched:pair", {
         peer: user1.email,
         peerSocketId: user1.socketId,
-        delay: true
+        delay: true,
       });
     }, 7000);
   }
-  isPairingInProgress = false;
 }
+
 io.on("connection", (socket) => {
   console.log("🔌 New connection:", socket.id);
   socket.on("user:online", ({ email }) => {
