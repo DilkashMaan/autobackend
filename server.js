@@ -1092,11 +1092,13 @@
 
 // server.js (Complete Refactored Version Using PostgreSQL Tables)
 
-const express = require("express");
-const http = require("http");
-const cors = require("cors");
-const { Server } = require("socket.io");
-const { Pool } = require("pg");
+import express from "express";
+import http from "http";
+import cors from "cors";
+import { Server } from "socket.io";
+import pg from "pg";
+
+const { Pool } = pg;
 
 const app = express();
 app.use(cors());
@@ -1206,4 +1208,3 @@ io.on("connection", (socket) => {
 server.listen(8000, () => {
   console.log("Server listening on port 8000");
 });
-
