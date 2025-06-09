@@ -973,21 +973,31 @@ io.on("connection", (socket) => {
       console.log("⚠️ Target socket ID not found for", data.to);
     }
   });
-  socket.on("user:leave", ({ email, secondUser }) => {
-    const now = Date.now();
-    const skipData = userSkipCounts.get(email) || { count: 0, lastSkippedAt: 0 };
-    if (now - skipData.lastSkippedAt > 10 * 60 * 1000) {
-      skipData.count = 0;
+
+  socket.on("user:leave", ({ email, secondUser, gender }) => {
+
+    if (gender === "male") {
+      const now = Date.now();
+      const skipData = userSkipCounts.get(email) || { count: 0, lastSkippedAt: 0 };
+
+      if (now - skipData.lastSkippedAt > 10 * 60 * 1000) {
+        skipData.count = 0;
+      }
+
+      if (skipData.count >= 5) {
+        socket.emit("skip:disabled", { cooldown: 10 * 60 }); // 10 minutes
+        return;
+      }
+
+      skipData.count++;
+      skipData.lastSkippedAt = now;
+      userSkipCounts.set(email, skipData);
+      console.log(`⏩ ${email} skipped ${secondUser} (${skipData.count} skips)`);
+    } else {
+      console.log(`⏩ ${email} skipped ${secondUser} (female - no counter)`);
     }
-    if (skipData.count >= 5) {
-      socket.emit("skip:disabled", { cooldown: 10 * 60 }); // 10 minutes in seconds
-      return;
-    }
-    skipData.count++;
-    skipData.lastSkippedAt = now;
-    userSkipCounts.set(email, skipData);
-    console.log(`⏩ ${email} skipped ${secondUser} (${skipData.count} skips)`);
-    // console.log(`⏩ ${email} skipped ${secondUser}`);
+
+    // Cleanup and continue pairing
     if (email) {
       onlineUsers.delete(email);
       delete userSocketMap[email];
@@ -997,13 +1007,16 @@ io.on("connection", (socket) => {
       connectingUsers.delete(email);
       connectingUsers.delete(secondUser);
     }
+
     const secondUserSocketId = userSocketMap[secondUser];
     if (secondUserSocketId) {
       io.to(secondUserSocketId).emit("peer:disconnected", { by: email });
     }
+
     if (!waitingQueue.find(u => u.email === email)) {
       waitingQueue.push({ email, socketId: socket.id });
     }
+
     pairUsers();
   });
   socket.on("peer:nego:needed", ({ to, offer }) => {
