@@ -1112,12 +1112,12 @@ const io = new Server(server, {
 });
 
 const pool = new Pool({
-  user: "postgres",
-  host: "localhost",
-  database: "videochat",
-  password: "admin@123",
-  port: 5432
+  connectionString: "postgresql://dilkash:LLZTQ4MBZOr52aioxpG6FSWStDvCpgV1@dpg-d0un9j3ipnbc73ej7vag-a.oregon-postgres.render.com/videochat_ilcb",
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
+
 
 const socketEmailMap = {};
 
