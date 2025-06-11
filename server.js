@@ -1244,8 +1244,8 @@ const pairUsers = async () => {
           paired.add(email);
         });
 
-        userSocketMap[user1.email] = user1.socketId;
-        userSocketMap[user2.email] = user2.socketId;
+        userSocketMap.set(user1.email, user1.socketId);
+        userSocketMap.set(user2.email, user2.socketId);
 
         io.to(user1.socketId).emit("matched:pair", {
           peer: user2.email,
