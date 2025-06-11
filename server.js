@@ -1081,6 +1081,69 @@
 
 
 
+//old pair users function 
+
+
+
+
+
+
+// const pairUsers = async () => {
+//   let available = waitingQueue.filter(u =>
+//     !inCallUsers.has(u.email) &&
+//     !connectingUsers.has(u.email)
+//   );
+
+//   waitingQueue.length = 0; // Clear and rebuild queue after filtering
+//   waitingQueue.push(...available);
+
+//   let paired = new Set(); // Prevent re-pairing within this cycle
+
+//   for (let i = 0; i < waitingQueue.length - 1; i++) {
+//     const user1 = waitingQueue[i];
+//     if (paired.has(user1.email)) continue;
+
+//     for (let j = i + 1; j < waitingQueue.length; j++) {
+//       const user2 = waitingQueue[j];
+//       if (paired.has(user2.email)) continue;
+
+//       const canPair = !(await isBlocked(user1.email, user2.email)) &&
+//         (user1.preference === 'any' || user1.preference === user2.gender) &&
+//         (user2.preference === 'any' || user2.preference === user1.gender);
+
+//       if (canPair) {
+//         [user1.email, user2.email].forEach(email => {
+//           inCallUsers.add(email);
+//           connectingUsers.add(email);
+//           paired.add(email);
+//         });
+
+//         io.to(user1.socketId).emit("matched:pair", {
+//           peer: user2.email,
+//           peerSocketId: user2.socketId
+//         });
+
+//         setTimeout(() => {
+//           io.to(user2.socketId).emit("matched:pair", {
+//             peer: user1.email,
+//             peerSocketId: user1.socketId,
+//             delay: true
+//           });
+//         }, 7000);
+//         break; // move to next user1
+//       }
+//     }
+//   }
+
+// After pairing, update the waitingQueue to keep unmatched users
+//   waitingQueue.length = 0;
+//   for (let user of available) {
+//     if (!paired.has(user.email)) waitingQueue.push(user);
+//   }
+// };
+
+
+
 
 import express from 'express';
 import pkg from 'pg';
@@ -1103,7 +1166,7 @@ app.use(express.json());
 // --- PostgreSQL Setup ---
 const { Pool } = pkg;
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || "your-fallback-url",
+  connectionString: "postgresql://dilkash:LLZTQ4MBZOr52aioxpG6FSWStDvCpgV1@dpg-d0un9j3ipnbc73ej7vag-a.oregon-postgres.render.com/videochat_ilcb" || "your-fallback-url",
   ssl: { rejectUnauthorized: false },
 });
 
@@ -1209,63 +1272,6 @@ const pairUsers = async () => {
 };
 
 
-
-
-
-
-// const pairUsers = async () => {
-//   let available = waitingQueue.filter(u =>
-//     !inCallUsers.has(u.email) &&
-//     !connectingUsers.has(u.email)
-//   );
-
-//   waitingQueue.length = 0; // Clear and rebuild queue after filtering
-//   waitingQueue.push(...available);
-
-//   let paired = new Set(); // Prevent re-pairing within this cycle
-
-//   for (let i = 0; i < waitingQueue.length - 1; i++) {
-//     const user1 = waitingQueue[i];
-//     if (paired.has(user1.email)) continue;
-
-//     for (let j = i + 1; j < waitingQueue.length; j++) {
-//       const user2 = waitingQueue[j];
-//       if (paired.has(user2.email)) continue;
-
-//       const canPair = !(await isBlocked(user1.email, user2.email)) &&
-//         (user1.preference === 'any' || user1.preference === user2.gender) &&
-//         (user2.preference === 'any' || user2.preference === user1.gender);
-
-//       if (canPair) {
-//         [user1.email, user2.email].forEach(email => {
-//           inCallUsers.add(email);
-//           connectingUsers.add(email);
-//           paired.add(email);
-//         });
-
-//         io.to(user1.socketId).emit("matched:pair", {
-//           peer: user2.email,
-//           peerSocketId: user2.socketId
-//         });
-
-//         setTimeout(() => {
-//           io.to(user2.socketId).emit("matched:pair", {
-//             peer: user1.email,
-//             peerSocketId: user1.socketId,
-//             delay: true
-//           });
-//         }, 7000);
-//         break; // move to next user1
-//       }
-//     }
-//   }
-
-// After pairing, update the waitingQueue to keep unmatched users
-//   waitingQueue.length = 0;
-//   for (let user of available) {
-//     if (!paired.has(user.email)) waitingQueue.push(user);
-//   }
-// };
 
 // --- Express Endpoint ---
 app.get('/api/online-users', (req, res) => {
