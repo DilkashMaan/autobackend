@@ -1374,9 +1374,15 @@ io.on("connection", socket => {
     if (secondSocket) {
       io.to(secondSocket).emit("peer:disconnected", { by: email });
     }
-    if (!waitingQueue.some(u => u.email === email)) {
-      waitingQueue.push({ email, socketId: socket.id });
-    }
+    const requeueIfOnline = (email) => {
+      const sid = getSocketId(email);
+      if (sid && !inCallUsers.has(email) && !waitingQueue.some(u => u.email === email)) {
+        waitingQueue.push({ email, socketId: sid });
+      }
+    };
+
+    requeueIfOnline(email);
+    requeueIfOnline(secondUser);
 
     pairUsers();
   });
