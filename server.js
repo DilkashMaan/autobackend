@@ -873,25 +873,29 @@ io.on("connection", (socket) => {
     console.log(`✅ ${email} is online as ${socket.id}`);
     io.emit("online:users", Array.from(onlineUsers).map(email => ({ email })));
   });
+  
   socket.on("user:ready", ({ email, gender, preference }) => {
-    if (inCallUsers.has(email)) return;
+    if (inCallUsers.has(email) || connectingUsers.has(email)) return;
+
     userSocketMap[email] = socket.id;
     const alreadyInQueue = waitingQueue.find(u => u.email === email);
+
     if (!alreadyInQueue) {
       waitingQueue.push({ email, socketId: socket.id, gender, preference });
       console.log(`🕒 ${email} added to waiting queue.`);
     }
+
     pairUsers();
+
+    // Re-check after 15s only if still not in call or queue
     setTimeout(() => {
-      if (!inCallUsers.has(email)) {
-        const stillInQueue = waitingQueue.find(u => u.email === email);
-        if (!stillInQueue) {
-          waitingQueue.push({ email, socketId: socket.id, gender, preference });
-          pairUsers();
-        }
+      if (!inCallUsers.has(email) && !waitingQueue.find(u => u.email === email)) {
+        waitingQueue.push({ email, socketId: socket.id, gender, preference });
+        pairUsers();
       }
     }, 15000);
   });
+
   socket.on("user:call", ({ to, offer }) => {
     const targetSocketId = userSocketMap[to];
     const fromEmail = getEmailBySocketId(socket.id);
