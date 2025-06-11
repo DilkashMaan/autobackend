@@ -1389,7 +1389,9 @@ io.on("connection", socket => {
   });
 
 
-  socket.on("user:leave", ({ email, secondUser, gender, isPremium }) => {
+  socket.on("user:leave", ({ to }) => {
+    console.log("user  leaver or skip the call", to);
+
     const sidEmail = getEmail(socket.id); // ✅ avoid name conflict
 
     if (sidEmail) {
