@@ -1295,7 +1295,7 @@ io.on("connection", socket => {
 
   socket.on("user:ready", async ({ email, gender, preference }) => {
     if (inCallUsers.has(email)) return;
-
+    console.log("waiting queue", waitingQueue)
     if (!waitingQueue.some(u => u.email === email)) {
       waitingQueue.push({ email, socketId: socket.id, gender, preference });
     }
