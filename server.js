@@ -1404,7 +1404,11 @@ io.on("connection", socket => {
     if (targetSocket) io.to(targetSocket).emit("peer:nego:final", { ans });
   });
 
-  socket.on("disconnect", () => {
+  socket.on("disconnect", (to) => {
+    const toSocketId = getUserSocketId(to);
+    if (toSocketId) {
+      io.to(toSocketId).emit("user:disconnected", { from: currentUserEmail });
+    }x
     const email = getEmail(socket.id);
     if (email) {
       userSocketMap.delete(email);
