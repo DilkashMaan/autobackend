@@ -1362,6 +1362,7 @@ io.on("connection", socket => {
     }
 
     console.log(`✅ Call accepted: ${from} and ${to} are now in call`);
+    console.log("waiting queue:", waitingQueue);
     console.log("📦 inCallUsers:", Array.from(inCallUsers));
 
 
