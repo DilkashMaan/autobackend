@@ -1301,6 +1301,16 @@ io.on("connection", socket => {
   console.log("🔌 Connected:", socket.id);
 
   socket.on("user:online", ({ email }) => {
+    const
+    const onlineuser = async (email) => {
+
+      await pool.query(`
+      INSERT INTO online_users (email, socket_id)
+      VALUES ($1, $2)
+     `,
+        [email, socket.id]
+      )
+    };
     if (!email) return;
     userSocketMap.set(email, socket.id);
     socketEmailMap.set(socket.id, email);
@@ -1427,10 +1437,10 @@ io.on("connection", socket => {
       io.to(toSocketId).emit("user:disconnected", { from: currentUserEmail });
     }
     const email = getEmail(socket.id);
-    console.log(`❌ Disconnected: ${email, currentUserEmail}`);
+    console.log(`❌ Disconnected: ${email}`);
     if (email) {
       userSocketMap.delete(email);
-      inCallUsers.delete(email);  
+      inCallUsers.delete(email);
       connectingUsers.delete(email);
       const idx = waitingQueue.findIndex(u => u.email === email);
       if (idx !== -1) waitingQueue.splice(idx, 1);
