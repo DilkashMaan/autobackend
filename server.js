@@ -1187,13 +1187,13 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 
 // --- Global In-Memory Store ---
-const userSocketMap = new Map();        // email -> socketId
-const socketEmailMap = new Map();       // socketId -> email
+const userSocketMap = new Map();
+const socketEmailMap = new Map();
 const waitingQueue = [];
 const inCallUsers = new Set();
 const connectingUsers = new Set();
-const userSkipCounts = new Map();       // email -> { count, lastSkippedAt }
-const callTimeouts = new Map();         // from-to -> timeout
+const userSkipCounts = new Map();
+const callTimeouts = new Map();
 
 // --- Utility Functions ---
 const getEmail = socketId => socketEmailMap.get(socketId);
@@ -1350,6 +1350,7 @@ io.on("connection", socket => {
     if (targetSocket) io.to(targetSocket).emit("receive-message", data);
   });
 
+
   socket.on("user:leave", ({ email, secondUser, gender, isPremium }) => {
     if (gender === "male" && !isPremium) {
       const now = Date.now();
@@ -1369,7 +1370,15 @@ io.on("connection", socket => {
       connectingUsers.delete(user);
     });
     delete socketEmailMap[socket.id];
-
+    const email = getEmail(socket.id);
+    if (email) {
+      userSocketMap.delete(email);
+      inCallUsers.delete(email);
+      connectingUsers.delete(email);
+      const idx = waitingQueue.findIndex(u => u.email === email);
+      if (idx !== -1) waitingQueue.splice(idx, 1);
+      socketEmailMap.delete(socket.id);
+    }
     const secondSocket = userSocketMap[secondUser];
     if (secondSocket) {
       io.to(secondSocket).emit("peer:disconnected", { by: email });
