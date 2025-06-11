@@ -1314,14 +1314,6 @@ io.on("connection", socket => {
     }
     deduplicateQueue();
     await pairUsers();
-
-    setTimeout(async () => {
-      if (!inCallUsers.has(email) && !waitingQueue.some(u => u.email === email)) {
-        waitingQueue.push({ email, socketId: socket.id, gender, preference });
-        deduplicateQueue();
-        await pairUsers();
-      }
-    }, 15000);
   });
 
   socket.on("user:call", ({ to, offer }) => {
@@ -1357,7 +1349,7 @@ io.on("connection", socket => {
       callTimeouts.delete(timeoutKey);
       deduplicateQueue();
       pairUsers();
-    }, 2000));
+    }, 10000));
 
     io.to(targetSocket).emit("incoming:call", { from, offer });
   });
