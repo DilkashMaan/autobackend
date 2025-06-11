@@ -1364,37 +1364,41 @@ io.on("connection", socket => {
       stats.lastSkippedAt = now;
       userSkipCounts.set(email, stats);
     }
-    [email, secondUser].forEach(user => {
-      delete userSocketMap[user];
-      inCallUsers.delete(user);
-      connectingUsers.delete(user);
-    });
-    delete socketEmailMap[socket.id];
-    const email = getEmail(socket.id);
-    if (email) {
-      userSocketMap.delete(email);
-      inCallUsers.delete(email);
-      connectingUsers.delete(email);
-      const idx = waitingQueue.findIndex(u => u.email === email);
-      if (idx !== -1) waitingQueue.splice(idx, 1);
-      socketEmailMap.delete(socket.id);
-    }
+    const firstSocket = userSocketMap[email];
     const secondSocket = userSocketMap[secondUser];
+
+    if (firstSocket) {
+      io.to(firstSocket).emit("peer:disconnected", { by: secondUser });
+    }
     if (secondSocket) {
       io.to(secondSocket).emit("peer:disconnected", { by: email });
     }
+    [email, secondUser].forEach((user) => {
+      const sid = getSocketId(user);
+      if (sid) {
+        socketEmailMap.delete(sid);
+      }
+      delete userSocketMap[user];
+      inCallUsers.delete(user);
+      connectingUsers.delete(user);
+      const idx = waitingQueue.findIndex((u) => u.email === user);
+      if (idx !== -1) waitingQueue.splice(idx, 1);
+    });
     const requeueIfOnline = (email) => {
       const sid = getSocketId(email);
-      if (sid && !inCallUsers.has(email) && !waitingQueue.some(u => u.email === email)) {
+      if (
+        sid &&
+        !inCallUsers.has(email) &&
+        !waitingQueue.some((u) => u.email === email)
+      ) {
         waitingQueue.push({ email, socketId: sid });
       }
     };
-
     requeueIfOnline(email);
     requeueIfOnline(secondUser);
-
     pairUsers();
   });
+
 
 
   socket.on("peer:nego:needed", ({ to, offer }) => {
