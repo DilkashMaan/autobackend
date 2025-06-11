@@ -1352,66 +1352,6 @@ io.on("connection", socket => {
 
 
   socket.on("user:leave", ({ email, secondUser, gender, isPremium }) => {
-    if (gender === "male" && !isPremium) {
-      const now = Date.now();
-      const stats = userSkipCounts.get(email) || { count: 0, lastSkippedAt: 0 };
-      if (now - stats.lastSkippedAt > 600_000) stats.count = 0;
-      if (stats.count >= 5) {
-        socket.emit("skip:disabled", { cooldown: 600 });
-        return;
-      }
-      stats.count++;
-      stats.lastSkippedAt = now;
-      userSkipCounts.set(email, stats);
-    }
-    const firstSocket = userSocketMap[email];
-    const secondSocket = userSocketMap[secondUser];
-
-    if (firstSocket) {
-      io.to(firstSocket).emit("peer:disconnected", { by: secondUser });
-    }
-    if (secondSocket) {
-      io.to(secondSocket).emit("peer:disconnected", { by: email });
-    }
-    [email, secondUser].forEach((user) => {
-      const sid = getSocketId(user);
-      if (sid) {
-        socketEmailMap.delete(sid);
-      }
-      delete userSocketMap[user];
-      inCallUsers.delete(user);
-      connectingUsers.delete(user);
-      const idx = waitingQueue.findIndex((u) => u.email === user);
-      if (idx !== -1) waitingQueue.splice(idx, 1);
-    });
-    const requeueIfOnline = (email) => {
-      const sid = getSocketId(email);
-      if (
-        sid &&
-        !inCallUsers.has(email) &&
-        !waitingQueue.some((u) => u.email === email)
-      ) {
-        waitingQueue.push({ email, socketId: sid });
-      }
-    };
-    requeueIfOnline(email);
-    requeueIfOnline(secondUser);
-    pairUsers();
-  });
-
-
-
-  socket.on("peer:nego:needed", ({ to, offer }) => {
-    const targetSocket = getSocketId(to);
-    if (targetSocket) io.to(targetSocket).emit("peer:nego:needed", { from: getEmail(socket.id), offer });
-  });
-
-  socket.on("peer:nego:done", ({ to, ans }) => {
-    const targetSocket = getSocketId(to);
-    if (targetSocket) io.to(targetSocket).emit("peer:nego:final", { ans });
-  });
-
-  socket.on("disconnect", () => {
     const email = getEmail(socket.id);
     if (email) {
       userSocketMap.delete(email);
@@ -1424,6 +1364,78 @@ io.on("connection", socket => {
     io.emit("online:users", Array.from(userSocketMap.keys()).map(email => ({ email })));
     pairUsers();
   });
+  // if (gender === "male" && !isPremium) {
+  //   const now = Date.now();
+  //   const stats = userSkipCounts.get(email) || { count: 0, lastSkippedAt: 0 };
+  //   if (now - stats.lastSkippedAt > 600_000) stats.count = 0;
+  //   if (stats.count >= 5) {
+  //     socket.emit("skip:disabled", { cooldown: 600 });
+  //     return;
+  //   }
+  //   stats.count++;
+  //   stats.lastSkippedAt = now;
+  //   userSkipCounts.set(email, stats);
+  // }
+  // const firstSocket = userSocketMap[email];
+  // const secondSocket = userSocketMap[secondUser];
+
+  // if (firstSocket) {
+  //   io.to(firstSocket).emit("peer:disconnected", { by: secondUser });
+  // }
+  // if (secondSocket) {
+  //   io.to(secondSocket).emit("peer:disconnected", { by: email });
+  // }
+  // [email, secondUser].forEach((user) => {
+  //   const sid = getSocketId(user);
+  //   if (sid) {
+  //     socketEmailMap.delete(sid);
+  //   }
+  //   delete userSocketMap[user];
+  //   inCallUsers.delete(user);
+  //   connectingUsers.delete(user);
+  //   const idx = waitingQueue.findIndex((u) => u.email === user);
+  //   if (idx !== -1) waitingQueue.splice(idx, 1);
+  // });
+  // const requeueIfOnline = (email) => {
+  //   const sid = getSocketId(email);
+  //   if (
+  //     sid &&
+  //     !inCallUsers.has(email) &&
+  //     !waitingQueue.some((u) => u.email === email)
+  //   ) {
+  //     waitingQueue.push({ email, socketId: sid });
+  //   }
+  // };
+  // requeueIfOnline(email);
+  // requeueIfOnline(secondUser);
+  // pairUsers();
+// });
+
+
+
+socket.on("peer:nego:needed", ({ to, offer }) => {
+  const targetSocket = getSocketId(to);
+  if (targetSocket) io.to(targetSocket).emit("peer:nego:needed", { from: getEmail(socket.id), offer });
+});
+
+socket.on("peer:nego:done", ({ to, ans }) => {
+  const targetSocket = getSocketId(to);
+  if (targetSocket) io.to(targetSocket).emit("peer:nego:final", { ans });
+});
+
+socket.on("disconnect", () => {
+  const email = getEmail(socket.id);
+  if (email) {
+    userSocketMap.delete(email);
+    inCallUsers.delete(email);
+    connectingUsers.delete(email);
+    const idx = waitingQueue.findIndex(u => u.email === email);
+    if (idx !== -1) waitingQueue.splice(idx, 1);
+  }
+  socketEmailMap.delete(socket.id);
+  io.emit("online:users", Array.from(userSocketMap.keys()).map(email => ({ email })));
+  pairUsers();
+});
 });
 
 // --- Start Server ---
