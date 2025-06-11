@@ -684,7 +684,8 @@ io.on("connection", (socket) => {
 });
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-/ import express from 'express';
+
+// import express from 'express';
 // import pkg from 'pg';
 // const { Pool } = pkg;
 // import cors from 'cors';
@@ -739,8 +740,8 @@ server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 // }
 // async function isBlocked(user1, user2, db) {
 //   const result = await db.query(
-//     `SELECT 1 FROM blocked_users WHERE 
-//       (blocker = $1 AND blocked = $2) OR 
+//     `SELECT 1 FROM blocked_users WHERE
+//       (blocker = $1 AND blocked = $2) OR
 //       (blocker = $2 AND blocked = $1)`,
 //     [user1, user2]
 //   );
