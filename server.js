@@ -1316,6 +1316,10 @@ io.on("connection", socket => {
     const targetSocket = getSocketId(to);
     if (!from || !targetSocket) return;
 
+    if (inCallUsers.has(from) || inCallUsers.has(to)) {
+      console.log(`❌ Cannot call, one of the users is already in a call: ${from}, ${to}`);
+      return;
+    }
     const timeoutKey = `${from}-${to}`;
     callTimeouts.set(timeoutKey, setTimeout(() => {
       console.log(`⏰ Call timeout between ${from} and ${to}`);
