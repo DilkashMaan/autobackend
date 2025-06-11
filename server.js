@@ -1235,16 +1235,14 @@ const pairUsers = async () => {
     !connectingUsers.has(u.email)
   );
 
-  waitingQueue.length = 0; // 🔥 Clear once and don't re-add here
-
   const paired = new Set();
 
-  for (let i = 0; i < waitingQueue.length - 1; i++) {
-    const user1 = waitingQueue[i];
+  for (let i = 0; i < available.length - 1; i++) {
+    const user1 = available[i];
     if (paired.has(user1.email)) continue;
 
-    for (let j = i + 1; j < waitingQueue.length; j++) {
-      const user2 = waitingQueue[j];
+    for (let j = i + 1; j < available.length; j++) {
+      const user2 = available[j];
       if (paired.has(user2.email)) continue;
 
       if (user1.email === lastTriedWith[user2.email]) continue;
@@ -1276,16 +1274,20 @@ const pairUsers = async () => {
           });
         }, 7000);
 
-        break; // go to next user1
+        break;
       }
     }
   }
 
+  // 💡 Clean and re-add only unmatched users
   waitingQueue.length = 0;
   for (let user of available) {
-    if (!paired.has(user.email)) waitingQueue.push(user);
+    if (!paired.has(user.email)) {
+      waitingQueue.push(user);
+    }
   }
 };
+
 
 
 
