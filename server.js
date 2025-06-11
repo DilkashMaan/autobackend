@@ -1301,16 +1301,16 @@ io.on("connection", socket => {
   console.log("🔌 Connected:", socket.id);
 
   socket.on("user:online", ({ email }) => {
-    const
-    const onlineuser = async (email) => {
+    // const
+    // const onlineuser = async (email) => {
 
-      await pool.query(`
-      INSERT INTO online_users (email, socket_id)
-      VALUES ($1, $2)
-     `,
-        [email, socket.id]
-      )
-    };
+    //   await pool.query(`
+    //   INSERT INTO online_users (email, socket_id)
+    //   VALUES ($1, $2)
+    //  `,
+    //     [email, socket.id]
+    //   )
+    // };
     if (!email) return;
     userSocketMap.set(email, socket.id);
     socketEmailMap.set(socket.id, email);
