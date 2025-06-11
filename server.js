@@ -1251,7 +1251,7 @@ const pairUsers = async () => {
       if (canPair) {
         [user1.email, user2.email].forEach(email => {
           inCallUsers.add(email);
-          connectingUsers.add(email);
+          // connectingUsers.add(email);
           paired.add(email);
         });
 
@@ -1301,16 +1301,6 @@ io.on("connection", socket => {
   console.log("🔌 Connected:", socket.id);
 
   socket.on("user:online", ({ email }) => {
-    // const
-    // const onlineuser = async (email) => {
-
-    //   await pool.query(`
-    //   INSERT INTO online_users (email, socket_id)
-    //   VALUES ($1, $2)
-    //  `,
-    //     [email, socket.id]
-    //   )
-    // };
     if (!email) return;
     userSocketMap.set(email, socket.id);
     socketEmailMap.set(socket.id, email);
@@ -1386,7 +1376,8 @@ io.on("connection", socket => {
     console.log(`✅ Call accepted: ${from} and ${to} are now in call`);
     console.log("waiting queue:", waitingQueue);
     console.log("📦 inCallUsers:", Array.from(inCallUsers));
-
+    userSocketMap.delete(from);
+    userSocketMap.delete(to);
 
     io.emit("online:users", Array.from(userSocketMap.keys()).map(email => ({ email })));
   });
