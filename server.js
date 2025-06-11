@@ -1430,7 +1430,7 @@ io.on("connection", socket => {
     console.log(`❌ Disconnected: ${email, currentUserEmail}`);
     if (email) {
       userSocketMap.delete(email);
-      inCallUsers.delete(email);
+      inCallUsers.delete(email);  
       connectingUsers.delete(email);
       const idx = waitingQueue.findIndex(u => u.email === email);
       if (idx !== -1) waitingQueue.splice(idx, 1);
