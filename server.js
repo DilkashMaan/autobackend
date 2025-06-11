@@ -1194,6 +1194,7 @@ const inCallUsers = new Set();
 const connectingUsers = new Set();
 const userSkipCounts = new Map();
 const callTimeouts = new Map();
+const lastTriedWith = {};
 
 // --- Utility Functions ---
 const getEmail = socketId => socketEmailMap.get(socketId);
@@ -1235,6 +1236,7 @@ const pairUsers = async () => {
       const user2 = waitingQueue[j];
       if (paired.has(user2.email)) continue;
 
+      if (user1.email === lastTriedWith[user2.email]) continue;
       const canPair = !(await isBlocked(user1.email, user2.email)) && gendersMatch(user1, user2);
 
       if (canPair) {
@@ -1246,6 +1248,9 @@ const pairUsers = async () => {
 
         userSocketMap.set(user1.email, user1.socketId);
         userSocketMap.set(user2.email, user2.socketId);
+
+        lastTriedWith[user1.email] = user2.email;
+        lastTriedWith[user2.email] = user1.email;
 
         io.to(user1.socketId).emit("matched:pair", {
           peer: user2.email,
