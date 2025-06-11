@@ -1357,24 +1357,24 @@ io.on("connection", socket => {
       stats.lastSkippedAt = now;
       userSkipCounts.set(email, stats);
     }
-
     [email, secondUser].forEach(user => {
       delete userSocketMap[user];
-      delete socketEmailMap[socket.id];
       inCallUsers.delete(user);
       connectingUsers.delete(user);
     });
-    socketEmailMap.delete(socket.id);
+    delete socketEmailMap[socket.id];
 
-    const secondSocket = getSocketId(secondUser);
-    if (secondSocket) io.to(secondSocket).emit("peer:disconnected", { by: email });
-
+    const secondSocket = userSocketMap[secondUser];
+    if (secondSocket) {
+      io.to(secondSocket).emit("peer:disconnected", { by: email });
+    }
     if (!waitingQueue.some(u => u.email === email)) {
       waitingQueue.push({ email, socketId: socket.id });
     }
 
     pairUsers();
   });
+
 
   socket.on("peer:nego:needed", ({ to, offer }) => {
     const targetSocket = getSocketId(to);
