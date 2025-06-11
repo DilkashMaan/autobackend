@@ -1314,12 +1314,19 @@ io.on("connection", socket => {
   socket.on("user:call", ({ to, offer }) => {
     const from = getEmail(socket.id);
     const targetSocket = getSocketId(to);
-    if (!from || !targetSocket) return;
-
-    if (inCallUsers.has(from) || inCallUsers.has(to)) {
-      console.log(`❌ Cannot call, one of the users is already in a call: ${from}, ${to}`);
+    if (!from || !targetSocket) {
+      console.log("❌ Call blocked: missing from/to");
       return;
     }
+
+    // ✅ Protect against calling users in a call
+    if (inCallUsers.has(from) || inCallUsers.has(to)) {
+      console.log(`❌ Call blocked: one of users in call. from=${from}, to=${to}`);
+      return;
+    }
+
+    console.log(`📞 Proceeding with call: from=${from} to=${to}`);
+
     const timeoutKey = `${from}-${to}`;
     callTimeouts.set(timeoutKey, setTimeout(() => {
       console.log(`⏰ Call timeout between ${from} and ${to}`);
@@ -1337,21 +1344,30 @@ io.on("connection", socket => {
     io.to(targetSocket).emit("incoming:call", { from, offer });
   });
 
+
   socket.on("call:accepted", ({ to, ans }) => {
     const from = getEmail(socket.id);
     const toSocket = getSocketId(to);
     const timeoutKey = `${to}-${from}`;
     clearTimeout(callTimeouts.get(timeoutKey));
     callTimeouts.delete(timeoutKey);
-    [from, to].forEach(email => {
-      inCallUsers.add(email);
-      connectingUsers.delete(email);
-    });
+
+    inCallUsers.add(from);
+    inCallUsers.add(to);
+    connectingUsers.delete(from);
+    connectingUsers.delete(to);
+
     if (toSocket) {
       io.to(toSocket).emit("call:accepted", { ans });
     }
+
+    console.log(`✅ Call accepted: ${from} and ${to} are now in call`);
+    console.log("📦 inCallUsers:", Array.from(inCallUsers));
+
+
     io.emit("online:users", Array.from(userSocketMap.keys()).map(email => ({ email })));
   });
+
 
 
   socket.on("send-message", data => {
