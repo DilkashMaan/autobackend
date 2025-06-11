@@ -1389,8 +1389,8 @@ io.on("connection", socket => {
   });
 
 
-  socket.on("user:leave", ({ to }) => {
-    console.log("user  leaver or skip the call", to);
+  socket.on("user:leave", ({ email, seconduser }) => {
+    console.log("user  leaver or skip the call", email, seconduser);
 
     const sidEmail = getEmail(socket.id); // ✅ avoid name conflict
 
@@ -1419,9 +1419,9 @@ io.on("connection", socket => {
     if (targetSocket) io.to(targetSocket).emit("peer:nego:final", { ans });
   });
 
-  socket.on("disconnect", (to) => {
-    const toSocketId = getSocketId(to);
-    console.log("disconnect email ", to)
+  socket.on("disconnect", () => {
+    // const toSocketId = getSocketId(to);
+    // console.log("disconnect email ", to)
     console.log("disconnect socket id ", toSocketId)
     if (toSocketId) {
       io.to(toSocketId).emit("user:disconnected", { from: currentUserEmail });
