@@ -1324,7 +1324,7 @@ io.on("connection", socket => {
       console.log(`❌ Call blocked: one of users in call. from=${from}, to=${to}`);
       return;
     }
-
+    console.log("waitingQueue:", waitingQueue);
     console.log(`📞 Proceeding with call: from=${from} to=${to}`);
 
     const timeoutKey = `${from}-${to}`;
