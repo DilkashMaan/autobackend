@@ -807,8 +807,8 @@ function getEmailBySocketId(socketId) {
 async function isBlocked(user1, user2, db) {
   const result = await db.query(
     `SELECT 1 FROM blocked_users WHERE 
-      (blocked_by = $1 AND blocked_user = $2) OR 
-      (blocked_by = $2 AND blocked_user = $1)`,
+      (blocker = $1 AND blocked = $2) OR 
+      (blocker = $2 AND blocked = $1)`,
     [user1, user2]
   );
   return result.rowCount > 0;
