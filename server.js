@@ -1199,6 +1199,18 @@ const lastTriedWith = {};
 // --- Utility Functions ---
 const getEmail = socketId => socketEmailMap.get(socketId);
 const getSocketId = email => userSocketMap.get(email);
+const deduplicateQueue = () => {
+  const seen = new Set();
+  const unique = [];
+  for (const user of waitingQueue) {
+    if (!seen.has(user.email)) {
+      seen.add(user.email);
+      unique.push(user);
+    }
+  }
+  waitingQueue.length = 0;
+  waitingQueue.push(...unique);
+};
 
 const isBlocked = async (user1, user2) => {
   const res = await pool.query(`
@@ -1300,12 +1312,13 @@ io.on("connection", socket => {
     if (!waitingQueue.some(u => u.email === email)) {
       waitingQueue.push({ email, socketId: socket.id, gender, preference });
     }
-
+    deduplicateQueue();
     await pairUsers();
 
     setTimeout(async () => {
       if (!inCallUsers.has(email) && !waitingQueue.some(u => u.email === email)) {
         waitingQueue.push({ email, socketId: socket.id, gender, preference });
+        deduplicateQueue();
         await pairUsers();
       }
     }, 15000);
@@ -1332,12 +1345,17 @@ io.on("connection", socket => {
       console.log(`⏰ Call timeout between ${from} and ${to}`);
       [from, to].forEach(user => connectingUsers.delete(user));
       [from, to].forEach(email => {
-        const sid = getSocketId(email);
-        if (sid) waitingQueue.push({ email, socketId: sid });
+        if (!inCallUsers.has(email)) {
+          const sid = getSocketId(email);
+          if (sid) {
+            waitingQueue.push({ email, socketId: sid });
+          }
+        }
       });
       io.to(getSocketId(from)).emit("call:timeout", { peer: to });
       io.to(getSocketId(to)).emit("call:timeout", { peer: from });
       callTimeouts.delete(timeoutKey);
+      deduplicateQueue();
       pairUsers();
     }, 2000));
 
@@ -1348,7 +1366,7 @@ io.on("connection", socket => {
   socket.on("call:accepted", ({ to, ans }) => {
     const from = getEmail(socket.id);
     const toSocket = getSocketId(to);
-    const timeoutKey = `${to}-${from}`;
+    const timeoutKey = `${from}-${to}`;
     clearTimeout(callTimeouts.get(timeoutKey));
     callTimeouts.delete(timeoutKey);
 
