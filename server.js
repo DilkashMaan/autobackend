@@ -1323,7 +1323,7 @@ io.on("connection", socket => {
       io.to(getSocketId(to)).emit("call:timeout", { peer: from });
       callTimeouts.delete(timeoutKey);
       pairUsers();
-    }, 20000));
+    }, 2000));
 
     io.to(targetSocket).emit("incoming:call", { from, offer });
   });
