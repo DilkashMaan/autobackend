@@ -1145,16 +1145,24 @@ const isBlocked = async (user1, user2) => {
   return res.rowCount > 0;
 };
 
+
+
+const gendersMatch = (a, b) => {
+  const aOk = a.preference === 'any' || a.preference === b.gender;
+  const bOk = b.preference === 'any' || b.preference === a.gender;
+  return aOk && bOk;
+};
+
 const pairUsers = async () => {
   let available = waitingQueue.filter(u =>
     !inCallUsers.has(u.email) &&
     !connectingUsers.has(u.email)
   );
 
-  waitingQueue.length = 0; // Clear and rebuild queue after filtering
+  waitingQueue.length = 0;
   waitingQueue.push(...available);
 
-  let paired = new Set(); // Prevent re-pairing within this cycle
+  const paired = new Set();
 
   for (let i = 0; i < waitingQueue.length - 1; i++) {
     const user1 = waitingQueue[i];
@@ -1164,9 +1172,7 @@ const pairUsers = async () => {
       const user2 = waitingQueue[j];
       if (paired.has(user2.email)) continue;
 
-      const canPair = !(await isBlocked(user1.email, user2.email)) &&
-        (user1.preference === 'any' || user1.preference === user2.gender) &&
-        (user2.preference === 'any' || user2.preference === user1.gender);
+      const canPair = !(await isBlocked(user1.email, user2.email)) && gendersMatch(user1, user2);
 
       if (canPair) {
         [user1.email, user2.email].forEach(email => {
@@ -1174,6 +1180,9 @@ const pairUsers = async () => {
           connectingUsers.add(email);
           paired.add(email);
         });
+
+        userSocketMap[user1.email] = user1.socketId;
+        userSocketMap[user2.email] = user2.socketId;
 
         io.to(user1.socketId).emit("matched:pair", {
           peer: user2.email,
@@ -1187,17 +1196,77 @@ const pairUsers = async () => {
             delay: true
           });
         }, 7000);
-        break; // move to next user1
+
+        break; // go to next user1
       }
     }
   }
 
-  // After pairing, update the waitingQueue to keep unmatched users
   waitingQueue.length = 0;
   for (let user of available) {
     if (!paired.has(user.email)) waitingQueue.push(user);
   }
 };
+
+
+
+
+
+
+// const pairUsers = async () => {
+//   let available = waitingQueue.filter(u =>
+//     !inCallUsers.has(u.email) &&
+//     !connectingUsers.has(u.email)
+//   );
+
+//   waitingQueue.length = 0; // Clear and rebuild queue after filtering
+//   waitingQueue.push(...available);
+
+//   let paired = new Set(); // Prevent re-pairing within this cycle
+
+//   for (let i = 0; i < waitingQueue.length - 1; i++) {
+//     const user1 = waitingQueue[i];
+//     if (paired.has(user1.email)) continue;
+
+//     for (let j = i + 1; j < waitingQueue.length; j++) {
+//       const user2 = waitingQueue[j];
+//       if (paired.has(user2.email)) continue;
+
+//       const canPair = !(await isBlocked(user1.email, user2.email)) &&
+//         (user1.preference === 'any' || user1.preference === user2.gender) &&
+//         (user2.preference === 'any' || user2.preference === user1.gender);
+
+//       if (canPair) {
+//         [user1.email, user2.email].forEach(email => {
+//           inCallUsers.add(email);
+//           connectingUsers.add(email);
+//           paired.add(email);
+//         });
+
+//         io.to(user1.socketId).emit("matched:pair", {
+//           peer: user2.email,
+//           peerSocketId: user2.socketId
+//         });
+
+//         setTimeout(() => {
+//           io.to(user2.socketId).emit("matched:pair", {
+//             peer: user1.email,
+//             peerSocketId: user1.socketId,
+//             delay: true
+//           });
+//         }, 7000);
+//         break; // move to next user1
+//       }
+//     }
+//   }
+
+// After pairing, update the waitingQueue to keep unmatched users
+//   waitingQueue.length = 0;
+//   for (let user of available) {
+//     if (!paired.has(user.email)) waitingQueue.push(user);
+//   }
+// };
+
 // --- Express Endpoint ---
 app.get('/api/online-users', (req, res) => {
   res.json({ onlineUsers: Array.from(userSocketMap.keys()) });
@@ -1290,7 +1359,8 @@ io.on("connection", socket => {
     }
 
     [email, secondUser].forEach(user => {
-      userSocketMap.delete(user);
+      delete userSocketMap[user];
+      delete socketEmailMap[socket.id];
       inCallUsers.delete(user);
       connectingUsers.delete(user);
     });
