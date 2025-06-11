@@ -1405,7 +1405,7 @@ io.on("connection", socket => {
   });
 
   socket.on("disconnect", (to) => {
-    const toSocketId = userSocketMap(to);
+    const toSocketId = getSocketId(to);
     console.log("disconnect email ", to)
     console.log("disconnect socket id ", toSocketId)
     if (toSocketId) {
