@@ -1202,7 +1202,7 @@ const getSocketId = email => userSocketMap.get(email);
 const isBlocked = async (user1, user2) => {
   const res = await pool.query(`
     SELECT 1 FROM blocked_users 
-    WHERE (blocked_by = $1 AND blocked_user = $2) OR (blocked_by = $2 AND blocked_user = $1)`,
+    WHERE (blocker = $1 AND blocked = $2) OR (blocker = $2 AND blocked = $1)`,
     [user1, user2]
   );
   return res.rowCount > 0;
