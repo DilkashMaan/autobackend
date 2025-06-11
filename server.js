@@ -1420,13 +1420,14 @@ io.on("connection", socket => {
   });
 
   socket.on("disconnect", (to) => {
-    const toSocketId = getSocketId(to); 
-    console.log("disconnect email ", to)
+    const toSocketId = getSocketId(to);
+    console.log("disconnect email ", to,)
     // console.log("disconnect socket id ", toSocketId)
     if (toSocketId) {
       io.to(toSocketId).emit("user:disconnected", { from: currentUserEmail });
     }
     const email = getEmail(socket.id);
+    console.log(`❌ Disconnected: ${email, currentUserEmail}`);
     if (email) {
       userSocketMap.delete(email);
       inCallUsers.delete(email);
