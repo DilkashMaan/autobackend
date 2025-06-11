@@ -1419,10 +1419,10 @@ io.on("connection", socket => {
     if (targetSocket) io.to(targetSocket).emit("peer:nego:final", { ans });
   });
 
-  socket.on("disconnect", () => {
-    // const toSocketId = getSocketId(to);
-    // console.log("disconnect email ", to)
-    console.log("disconnect socket id ", toSocketId)
+  socket.on("disconnect", (to) => {
+    const toSocketId = getSocketId(to); 
+    console.log("disconnect email ", to)
+    // console.log("disconnect socket id ", toSocketId)
     if (toSocketId) {
       io.to(toSocketId).emit("user:disconnected", { from: currentUserEmail });
     }
