@@ -1291,6 +1291,7 @@ io.on("connection", socket => {
     userSocketMap.set(email, socket.id);
     socketEmailMap.set(socket.id, email);
     io.emit("online:users", Array.from(userSocketMap.keys()).map(email => ({ email })));
+    console.log("waitingQueue:", waitingQueue);
   });
 
   socket.on("user:ready", async ({ email, gender, preference }) => {
