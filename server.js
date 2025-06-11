@@ -1339,16 +1339,16 @@ io.on("connection", socket => {
     const timeoutKey = `${to}-${from}`;
     clearTimeout(callTimeouts.get(timeoutKey));
     callTimeouts.delete(timeoutKey);
-
+    [from, to].forEach(email => {
+      inCallUsers.add(email);
+      connectingUsers.delete(email);
+    });
     if (toSocket) {
       io.to(toSocket).emit("call:accepted", { ans });
-      [from, to].forEach(email => {
-        inCallUsers.add(email);
-        connectingUsers.delete(email);
-      });
-      io.emit("online:users", Array.from(userSocketMap.keys()).map(email => ({ email })));
     }
+    io.emit("online:users", Array.from(userSocketMap.keys()).map(email => ({ email })));
   });
+
 
   socket.on("send-message", data => {
     const targetSocket = getSocketId(data.to);
