@@ -1376,7 +1376,7 @@ io.on("connection", socket => {
     console.log(`✅ Call accepted: ${from} and ${to} are now in call`);
     console.log("waiting queue:", waitingQueue);
     console.log("📦 inCallUsers:", Array.from(inCallUsers));
-    userSocketMap.delete(from);
+    userSocketMap.delete(from); AAAAAAAAAAAAAAAAAAaa
     userSocketMap.delete(to);
 
     io.emit("online:users", Array.from(userSocketMap.keys()).map(email => ({ email })));
@@ -1413,21 +1413,6 @@ io.on("connection", socket => {
     }
 
     await pairUsers(); // Try to pair again
-  });
-
-  socket.on("call:ended", ({ reason, peer }) => {
-    console.log(`🔚 Call ended by ${peer}: ${reason}`);
-    console.log("socket.id:", socket.id);
-
-
-
-    // Requeue user
-    const email = getEmail(socket.id);
-    console.log(`Requeuing user: ${email}`);
-    if (email) {
-      socket.emit("user:ready", { email });
-      console.log(`✅ ${email} requeued after call ended`);
-    }
   });
 
   socket.on("send-message", data => {
