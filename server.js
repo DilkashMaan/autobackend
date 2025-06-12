@@ -1377,8 +1377,7 @@ io.on("connection", socket => {
     console.log(`✅ Call accepted: ${from} and ${to} are now in call`);
     console.log("waiting queue:", waitingQueue);
     console.log("📦 inCallUsers:", Array.from(inCallUsers));
-    userSocketMap.delete(from);
-    userSocketMap.delete(to);
+
 
     io.emit("online:users", Array.from(userSocketMap.keys()).map(email => ({ email })));
   });
