@@ -1423,6 +1423,7 @@ io.on("connection", socket => {
     const email = getEmail(socket.id);
     if (email) {
       socket.emit("user:ready", { email });
+      console.log(`✅ ${email} requeued after call ended`);
     }
   });
 
