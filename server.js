@@ -1213,22 +1213,22 @@ const deduplicateQueue = () => {
   waitingQueue.push(...unique);
 };
 
-const isBlocked = async (user1, user2) => {
-  const res = await pool.query(`
-    SELECT 1 FROM blocked_users 
-    WHERE (blocker = $1 AND blocked = $2) OR (blocker = $2 AND blocked = $1)`,
-    [user1, user2]
-  );
-  return res.rowCount > 0;
-};
+// const isBlocked = async (user1, user2) => {
+//   const res = await pool.query(`
+//     SELECT 1 FROM blocked_users 
+//     WHERE (blocker = $1 AND blocked = $2) OR (blocker = $2 AND blocked = $1)`,
+//     [user1, user2]
+//   );
+//   return res.rowCount > 0;
+// };
 
 
 
-const gendersMatch = (a, b) => {
-  const aOk = a.preference === 'any' || a.preference === b.gender;
-  const bOk = b.preference === 'any' || b.preference === a.gender;
-  return aOk && bOk;
-};
+// const gendersMatch = (a, b) => {
+//   const aOk = a.preference === 'any' || a.preference === b.gender;
+//   const bOk = b.preference === 'any' || b.preference === a.gender;
+//   return aOk && bOk;
+// };
 
 const pairUsers = async () => {
   const available = waitingQueue.filter(u =>
@@ -1252,7 +1252,7 @@ const pairUsers = async () => {
       if (canPair) {
         [user1.email, user2.email].forEach(email => {
           inCallUsers.add(email);
-          connectingUsers.add(email);
+          // connectingUsers.add(email);
           paired.add(email);
         });
 
@@ -1305,7 +1305,8 @@ io.on("connection", socket => {
     if (!email) return;
     userSocketMap.set(email, socket.id);
     socketEmailMap.set(socket.id, email);
-    io.emit("online:users", Array.from(userSocketMap.keys()).map(email => ({ email })));
+    const queueUsers = waitingQueue.map(email => ({ email }));
+    io.emit("waiting:queue", queueUsers);
     console.log("waitingQueue:", waitingQueue);
   });
 
@@ -1379,7 +1380,8 @@ io.on("connection", socket => {
     console.log("📦 inCallUsers:", Array.from(inCallUsers));
 
 
-    io.emit("online:users", Array.from(userSocketMap.keys()).map(email => ({ email })));
+    const queueUsers = waitingQueue.map(email => ({ email }));
+    io.emit("waiting:queue", queueUsers);
   });
 
   socket.on("call:skipped", async ({ from, to }) => {
@@ -1437,7 +1439,8 @@ io.on("connection", socket => {
 
     socketEmailMap.delete(socket.id);
 
-    io.emit("online:users", Array.from(userSocketMap.keys()).map(email => ({ email })));
+    const queueUsers = waitingQueue.map(email => ({ email }));
+    io.emit("waiting:queue", queueUsers);
 
     pairUsers();
   });
@@ -1469,7 +1472,8 @@ io.on("connection", socket => {
       if (idx !== -1) waitingQueue.splice(idx, 1);
     }
     socketEmailMap.delete(socket.id);
-    io.emit("online:users", Array.from(userSocketMap.keys()).map(email => ({ email })));
+    const queueUsers = waitingQueue.map(email => ({ email }));
+    io.emit("waiting:queue", queueUsers);
     pairUsers();
   });
 });
