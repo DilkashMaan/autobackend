@@ -1420,7 +1420,10 @@ io.on("connection", socket => {
 
 
     // Requeue user
-    socket.emit("user:ready", { email: currentUser.email });
+    const email = getEmail(socket.id);
+    if (email) {
+      socket.emit("user:ready", { email });
+    }
   });
 
   socket.on("send-message", data => {
