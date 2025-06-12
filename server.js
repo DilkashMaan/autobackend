@@ -1203,19 +1203,19 @@ const deduplicateQueue = () => {
   waitingQueue.length = 0;
   waitingQueue.push(...unique);
 };
-// const isBlocked = async (user1, user2) => {
-//   const res = await pool.query(`
-//     SELECT 1 FROM blocked_users 
-//     WHERE (blocker = $1 AND blocked = $2) OR (blocker = $2 AND blocked = $1)`,
-//     [user1, user2]
-//   );
-//   return res.rowCount > 0;
-// };
-// const gendersMatch = (a, b) => {
-//   const aOk = a.preference === 'any' || a.preference === b.gender;
-//   const bOk = b.preference === 'any' || b.preference === a.gender;
-//   return aOk && bOk;
-// };
+const isBlocked = async (user1, user2) => {
+  const res = await pool.query(`
+    SELECT 1 FROM blocked_users 
+    WHERE (blocker = $1 AND blocked = $2) OR (blocker = $2 AND blocked = $1)`,
+    [user1, user2]
+  );
+  return res.rowCount > 0;
+};
+const gendersMatch = (a, b) => {
+  const aOk = a.preference === 'any' || a.preference === b.gender;
+  const bOk = b.preference === 'any' || b.preference === a.gender;
+  return aOk && bOk;
+};
 const pairUsers = async () => {
   const available = waitingQueue.filter(u =>
     !inCallUsers.has(u.email) &&
@@ -1411,7 +1411,7 @@ io.on("connection", socket => {
       if (idx !== -1) waitingQueue.splice(idx, 1);
     }
     socketEmailMap.delete(socket.id);
-    const queueUsers = waitingQueue.map(email => ({ email }));  
+    const queueUsers = waitingQueue.map(email => ({ email }));
     io.emit("waiting:queue", queueUsers);
     pairUsers();
   });
