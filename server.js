@@ -1252,7 +1252,7 @@ const pairUsers = async () => {
       if (canPair) {
         [user1.email, user2.email].forEach(email => {
           inCallUsers.add(email);
-          // connectingUsers.add(email);
+          connectingUsers.add(email);
           paired.add(email);
         });
 
