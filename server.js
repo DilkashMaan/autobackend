@@ -1418,10 +1418,6 @@ io.on("connection", socket => {
   socket.on("call:ended", ({ reason, peer }) => {
     console.log(`🔚 Call ended by ${peer}: ${reason}`);
 
-    cleanupPeerConnection(true); // Keeps local video
-    setMessages([]);
-    setPartnerEmail(null);
-    setIsSearching(true);
 
     // Requeue user
     socket.emit("user:ready", { email: currentUser.email });
