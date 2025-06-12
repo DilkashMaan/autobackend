@@ -1199,6 +1199,7 @@ const lastTriedWith = {};
 // --- Utility Functions ---
 const getEmail = socketId => socketEmailMap.get(socketId);
 const getSocketId = email => userSocketMap.get(email);
+const chatsocketid = email => inCallUsers.get(email)
 const deduplicateQueue = () => {
   const seen = new Set();
   const unique = [];
@@ -1416,7 +1417,7 @@ io.on("connection", socket => {
   });
 
   socket.on("send-message", data => {
-    const targetSocket = getSocketId(data.to);
+    const targetSocket = chatsocketid(data.to);
     console.log("🔁 userSocketMap:", targetSocket);
     if (targetSocket) io.to(targetSocket).emit("receive-message", data);
   });
