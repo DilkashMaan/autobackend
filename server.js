@@ -1417,6 +1417,7 @@ io.on("connection", socket => {
 
   socket.on("send-message", data => {
     const targetSocket = getSocketId(data.to);
+    console.log("🔁 userSocketMap:", targetSocket);
     if (targetSocket) io.to(targetSocket).emit("receive-message", data);
   });
 
