@@ -1417,6 +1417,7 @@ io.on("connection", socket => {
 
   socket.on("call:ended", ({ reason, peer }) => {
     console.log(`🔚 Call ended by ${peer}: ${reason}`);
+    console.log(`✅ ${email} requeued after call ended`); 
 
 
     // Requeue user
