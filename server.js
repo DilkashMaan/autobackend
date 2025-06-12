@@ -1382,42 +1382,43 @@ io.on("connection", socket => {
     io.emit("online:users", Array.from(userSocketMap.keys()).map(email => ({ email })));
   });
 
-    socket.on("call:skipped", async ({ from, to }) => {
-      console.log(`⚠️ Call skipped by ${from}, ending call with ${to}`);
+  socket.on("call:skipped", async ({ from, to }) => {
+    console.log(`⚠️ Call skipped by ${from}, ending call with ${to}`);
 
-      // Remove from inCall and connecting states
-      inCallUsers.delete(from);
-      inCallUsers.delete(to);
-      connectingUsers.delete(from);
-      connectingUsers.delete(to);
+    // Remove from inCall and connecting states
+    inCallUsers.delete(from);
+    inCallUsers.delete(to);
+    connectingUsers.delete(from);
+    connectingUsers.delete(to);
 
-      const fromSocketId = getSocketId(from);
-      const toSocketId = getSocketId(to);
+    const fromSocketId = getSocketId(from);
+    const toSocketId = getSocketId(to);
 
-      // Requeue both users
-      if (fromSocketId) {
-        waitingQueue.push({ email: from, socketId: fromSocketId });
-      }
-      if (toSocketId) {
-        waitingQueue.push({ email: to, socketId: toSocketId });
-      }
+    // Requeue both users
+    if (fromSocketId) {
+      waitingQueue.push({ email: from, socketId: fromSocketId });
+    }
+    if (toSocketId) {
+      waitingQueue.push({ email: to, socketId: toSocketId });
+    }
 
-      deduplicateQueue();
+    deduplicateQueue();
 
-      // Notify both parties
-      if (fromSocketId) {
-        io.to(fromSocketId).emit("call:ended", { reason: "skipped", peer: to });
-      }
-      if (toSocketId) {
-        io.to(toSocketId).emit("call:ended", { reason: "skipped", peer: from });
-      }
+    // Notify both parties
+    if (fromSocketId) {
+      io.to(fromSocketId).emit("call:ended", { reason: "skipped", peer: to });
+    }
+    if (toSocketId) {
+      io.to(toSocketId).emit("call:ended", { reason: "skipped", peer: from });
+    }
 
-      await pairUsers(); // Try to pair again
-    });
+    await pairUsers(); // Try to pair again
+  });
 
   socket.on("call:ended", ({ reason, peer }) => {
     console.log(`🔚 Call ended by ${peer}: ${reason}`);
-    console.log(`✅ ${email} requeued after call ended`); 
+    console.log("socket.id:", socket.id);
+
 
 
     // Requeue user
