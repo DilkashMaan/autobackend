@@ -1187,6 +1187,8 @@ const waitingQueue = [];
 const inCallUsers = new Set();
 const connectingUsers = new Set();
 const userSkipCounts = new Map();
+const userMetaMap = new Map();
+
 
 const lastTriedWith = {};
 // --- Utility Functions ---
@@ -1256,18 +1258,11 @@ const pairUsers = async () => {
       }
     }
   }
-  // 💡 Clean and re-add only unmatched users
-  waitingQueue.length = 0;
-  for (let user of available) {
-    if (!paired.has(user.email)) {
-      waitingQueue.push(user);
-    }
-  }
-};
+}
 // --- Express Endpoint ---
-app.get('/api/online-users', (req, res) => {
-  res.json({ onlineUsers: Array.from(userSocketMap.keys()) });
-});
+// app.get('/api/online-users', (req, res) => {
+//   res.json({ onlineUsers: Array.from(userSocketMap.keys()) });
+// });
 // --- Socket.IO ---
 io.on("connection", socket => {
   console.log("🔌 Connected:", socket.id);
@@ -1282,8 +1277,10 @@ io.on("connection", socket => {
   socket.on("user:ready", async ({ email, gender, preference }) => {
     if (inCallUsers.has(email)) return;
     console.log("waiting queue", waitingQueue)
+
     if (!waitingQueue.some(u => u.email === email)) {
       waitingQueue.push({ email, socketId: socket.id, gender, preference });
+      userMetaMap.set(email, { gender, preference }); // ✅ Store meta
     }
     deduplicateQueue();
     await pairUsers();
@@ -1331,57 +1328,22 @@ io.on("connection", socket => {
     io.emit("online:users", Array.from(connectedusers.keys()).map(email => ({ email })));
   });
 
-
-
-  // socket.on("call:skipped", async ({ from, to }) => {
-  //   console.log(`⚠️ Call skipped by ${from}, ending call with ${to}`);
-  //   // Remove from inCall and connecting states
-  //   inCallUsers.delete(from);
-  //   inCallUsers.delete(to);
-  //   connectedusers.add(from);
-  //   connectedusers.add(to);
-  //   const fromSocketId = getSocketId(from);
-  //   const toSocketId = getSocketId(to);
-  //   // Requeue both users
-  //   if (fromSocketId) {
-  //     connectedusers.push({ email: from, socketId: fromSocketId, gender: "male", preference: "any" });
-  //   }
-  //   if (toSocketId) {
-  //     connectedusers.push({ email: from, socketId: fromSocketId, gender: "male", preference: "any" });
-  //   }
-  //   deduplicateQueue();
-  //   // Notify both parties
-  //   if (fromSocketId) {
-  //     io.to(fromSocketId).emit("call:ended", { reason: "skipped", peer: to });
-
-
-  //   }
-  //   if (toSocketId) {
-  //     io.to(toSocketId).emit("call:ended", { reason: "skipped", peer: from });
-
-  //   }
-  //   if (waitingQueue.length >= 2) {
-  //     pairUsers();
-  //   }
-  //   await pairUsers(); // Try to pair again
-  // });
-
   socket.on("call:skipped", async ({ from, to }) => {
     console.log(`⚠️ Call skipped by ${from}, ending call with ${to}`);
 
-    // 1. Clean out any call state
+    // ✅ Proper cleanup
     inCallUsers.delete(from);
     inCallUsers.delete(to);
     connectingUsers.delete(from);
     connectingUsers.delete(to);
 
-    // 2. Restore them to connected users
     const fromSocketId = getSocketId(from);
     const toSocketId = getSocketId(to);
+
+    // 🧠 Make sure they're back in connected users
     if (fromSocketId) connectedusers.set(from, fromSocketId);
     if (toSocketId) connectedusers.set(to, toSocketId);
 
-    // 3. Simulate fresh 'user:ready' state
     const fromMeta = userMetaMap.get(from);
     const toMeta = userMetaMap.get(to);
 
@@ -1394,7 +1356,6 @@ io.on("connection", socket => {
 
     deduplicateQueue();
 
-    // 4. Notify both users
     if (fromSocketId) {
       io.to(fromSocketId).emit("call:ended", { reason: "skipped", peer: to });
     }
@@ -1402,9 +1363,13 @@ io.on("connection", socket => {
       io.to(toSocketId).emit("call:ended", { reason: "skipped", peer: from });
     }
 
-    // 5. Pair them like it's their first time
+    console.log("🧹 CLEANUP inCallUsers:", Array.from(inCallUsers));
+    console.log("📥 Queue after skip:", waitingQueue.map(u => u.email));
+
     await pairUsers();
   });
+
+
 
 
   socket.on("send-message", data => {
@@ -1412,20 +1377,7 @@ io.on("connection", socket => {
     console.log("🔁 userSocketMap:", targetSocket);
     if (targetSocket) io.to(targetSocket).emit("receive-message", data);
   });
-  socket.on("user:leave", ({ email, seconduser }) => {
-    console.log("user  leaver or skip the call", email, seconduser);
-    const sidEmail = getEmail(socket.id); // ✅ avoid name conflict
-    if (sidEmail) {
-      userSocketMap.delete(sidEmail);
-      inCallUsers.delete(sidEmail);
-      connectingUsers.delete(sidEmail);
-      const idx = waitingQueue.findIndex(u => u.email === sidEmail);
-      if (idx !== -1) waitingQueue.splice(idx, 1);
-    }
-    socketEmailMap.delete(socket.id);
-    io.emit("online:users", Array.from(connectedusers.keys()).map(email => ({ email })));
-    pairUsers();
-  });
+
   socket.on("peer:nego:needed", ({ to, offer }) => {
     const targetSocket = getSocketId(to);
     if (targetSocket) io.to(targetSocket).emit("peer:nego:needed", { from: getEmail(socket.id), offer });
@@ -1453,6 +1405,7 @@ io.on("connection", socket => {
       connectedusers.delete(email); // ✅ REMOVE from connectedusers
       inCallUsers.delete(email);
       connectingUsers.delete(email);
+      userMetaMap.delete(email);
 
       const idx = waitingQueue.findIndex(u => u.email === email);
       if (idx !== -1) waitingQueue.splice(idx, 1);
