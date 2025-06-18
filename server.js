@@ -1263,7 +1263,15 @@ const gendersMatch = (a, b) => {
   return aOk && bOk;
 };
 
+let isPairing = false;
+
 const pairUsers = async () => {
+    if (isPairing) {
+    console.log("⏳ Pairing already in progress, skipping this run.");
+    return;
+  }
+  isPairing = true;
+   try {
   const available = waitingQueue.filter(u => !inCallUsers.has(u.email));
   console.log("🔍 Available for pairing:", available.map(u => u.email));
 
@@ -1333,6 +1341,12 @@ const pairUsers = async () => {
   if (paired.size === 0) {
     console.log("🔍 No matches found this round.");
   }
+  } catch (err) {
+    console.error("❌ Error during pairing:", err);
+  } finally {
+    isPairing = false;
+  }
+};
 };
 
 
