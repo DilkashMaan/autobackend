@@ -1347,7 +1347,7 @@ const pairUsers = async () => {
     isPairing = false;
   }
 };
-};
+
 
 
 
