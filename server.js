@@ -1143,6 +1143,49 @@
 // };
 
 
+// const pairUsers = async () => {
+//   const available = waitingQueue.filter(u =>
+//     !inCallUsers.has(u.email) &&
+//     !connectingUsers.has(u.email)
+//   );
+//   const paired = new Set();
+//   for (let i = 0; i < available.length - 1; i++) {
+//     const user1 = available[i];
+//     if (paired.has(user1.email)) continue;
+//     for (let j = i + 1; j < available.length; j++) {
+//       const user2 = available[j];
+//       if (paired.has(user2.email)) continue;
+//       if (user1.email === lastTriedWith[user2.email]) continue;
+//       const canPair = !(await isBlocked(user1.email, user2.email)) && gendersMatch(user1, user2);
+//       if (canPair) {
+//         [user1.email, user2.email].forEach(email => {
+//           inCallUsers.add(email);
+//           // connectingUsers.add(email);
+//           paired.add(email);
+//         });
+//         userSocketMap.set(user1.email, user1.socketId);
+//         userSocketMap.set(user2.email, user2.socketId);
+//         lastTriedWith[user1.email] = user2.email;
+//         lastTriedWith[user2.email] = user1.email;
+//         io.to(user1.socketId).emit("matched:pair", {
+//           peer: user2.email,
+//           peerSocketId: user2.socketId
+//         });
+//         setTimeout(() => {
+//           io.to(user2.socketId).emit("matched:pair", {
+//             peer: user1.email,
+//             peerSocketId: user1.socketId,
+//             delay: true
+//           });
+//         }, 7000);
+//         break;
+//       }
+//     }
+//   }
+// }
+
+
+
 
 import express from 'express';
 import pkg from 'pg';
@@ -1183,7 +1226,7 @@ app.use('/api/auth', authRoutes);
 const userSocketMap = new Map();
 const socketEmailMap = new Map();
 const connectedusers = new Map();
-const waitingQueue = [];
+let waitingQueue = [];
 const inCallUsers = new Set();
 const connectingUsers = new Set();
 const userSkipCounts = new Map();
@@ -1219,46 +1262,81 @@ const gendersMatch = (a, b) => {
   const bOk = b.preference === 'any' || b.preference === a.gender;
   return aOk && bOk;
 };
+
 const pairUsers = async () => {
-  const available = waitingQueue.filter(u =>
-    !inCallUsers.has(u.email) &&
-    !connectingUsers.has(u.email)
-  );
+  const available = waitingQueue.filter(u => !inCallUsers.has(u.email));
+  console.log("🔍 Available for pairing:", available.map(u => u.email));
+
   const paired = new Set();
-  for (let i = 0; i < available.length - 1; i++) {
+
+  outer: for (let i = 0; i < available.length - 1; i++) {
     const user1 = available[i];
     if (paired.has(user1.email)) continue;
+
     for (let j = i + 1; j < available.length; j++) {
       const user2 = available[j];
       if (paired.has(user2.email)) continue;
-      if (user1.email === lastTriedWith[user2.email]) continue;
+
+      // if (user1.email === lastTriedWith[user2.email]) continue;
+
       const canPair = !(await isBlocked(user1.email, user2.email)) && gendersMatch(user1, user2);
-      if (canPair) {
-        [user1.email, user2.email].forEach(email => {
-          inCallUsers.add(email);
-          // connectingUsers.add(email);
-          paired.add(email);
-        });
-        userSocketMap.set(user1.email, user1.socketId);
-        userSocketMap.set(user2.email, user2.socketId);
-        lastTriedWith[user1.email] = user2.email;
-        lastTriedWith[user2.email] = user1.email;
-        io.to(user1.socketId).emit("matched:pair", {
-          peer: user2.email,
-          peerSocketId: user2.socketId
-        });
-        setTimeout(() => {
-          io.to(user2.socketId).emit("matched:pair", {
-            peer: user1.email,
-            peerSocketId: user1.socketId,
-            delay: true
-          });
-        }, 7000);
-        break;
+      if (!canPair) continue;
+      const blocked = await isBlocked(user1.email, user2.email);
+      console.log(`🚫 Block check between ${user1.email} and ${user2.email}: ${blocked}`);
+
+
+      const socketId1 = getSocketId(user1.email);
+      const socketId2 = getSocketId(user2.email);
+
+      console.log("🧠 socketId1:", socketId1, "for", user1.email);
+      console.log("🧠 socketId2:", socketId2, "for", user2.email);
+
+      if (!socketId1 || !socketId2) {
+        console.warn("⚠️ Skipping pairing due to missing socketId", { socketId1, socketId2 });
+        continue;
       }
+
+      [user1.email, user2.email].forEach(email => {
+        inCallUsers.add(email);
+        paired.add(email);
+      });
+
+      // ✅ CLEANUP: Remove paired users from the queue
+      waitingQueue = waitingQueue.filter(
+        u => u.email !== user1.email && u.email !== user2.email
+      );
+
+      console.log("🎉 Pairing:", user1.email, user2.email);
+
+      userSocketMap.set(user1.email, user1.socketId);
+      userSocketMap.set(user2.email, user2.socketId);
+      lastTriedWith[user1.email] = user2.email;
+      lastTriedWith[user2.email] = user1.email;
+
+      io.to(socketId1).emit("matched:pair", {
+        peer: user2.email,
+        peerSocketId: socketId2,
+        initiator: true
+      });
+
+      io.to(socketId2).emit("matched:pair", {
+        peer: user1.email,
+        peerSocketId: socketId1,
+        initiator: false
+      });
+
+      continue outer;
     }
   }
-}
+
+  // ✅ Log when no matches were found
+  if (paired.size === 0) {
+    console.log("🔍 No matches found this round.");
+  }
+};
+
+
+
 // --- Express Endpoint ---
 // app.get('/api/online-users', (req, res) => {
 //   res.json({ onlineUsers: Array.from(userSocketMap.keys()) });
@@ -1267,48 +1345,66 @@ const pairUsers = async () => {
 io.on("connection", socket => {
   console.log("🔌 Connected:", socket.id);
   socket.on("user:online", ({ email }) => {
+    console.log("📥 user:online received:", email);
     if (!email) return;
     userSocketMap.set(email, socket.id);
     socketEmailMap.set(socket.id, email);
     connectedusers.set(email, socket.id);
     io.emit("online:users", Array.from(connectedusers.keys()).map(email => ({ email })));
-    console.log("waitingQueue:", waitingQueue);
+    console.log("connectedusers:", connectedusers);
+
+    // ✅ Acknowledge so frontend knows when it's safe to emit user:ready
+    socket.emit("online:ack");
+  });
+  socket.onAny((event, ...args) => {
+    console.log(`📥 [socket.onAny] ${event}:`, args);
   });
   socket.on("user:ready", async ({ email, gender, preference }) => {
-    if (inCallUsers.has(email)) return;
-    console.log("waiting queue", waitingQueue)
-
-    if (!waitingQueue.some(u => u.email === email)) {
-      waitingQueue.push({ email, socketId: socket.id, gender, preference });
-      userMetaMap.set(email, { gender, preference }); // ✅ Store meta
+    if (!getSocketId(email)) {
+      console.warn("⚠️ user:ready emitted before user:online!", email);
+      return;
     }
+
+    if (inCallUsers.has(email)) return;
+
+    connectingUsers.add(email);
+    console.log("📥 user:ready:", { email, gender, preference });
+    // 🔄 Always update user metadata
+    userMetaMap.set(email, { gender, preference });
+
+    // 🔄 Always update socketId in queue or add new
+    const existingIndex = waitingQueue.findIndex(u => u.email === email);
+    if (existingIndex !== -1) {
+      waitingQueue[existingIndex] = { email, socketId: socket.id, gender, preference };
+    } else {
+      waitingQueue.push({ email, socketId: socket.id, gender, preference });
+    }
+
     deduplicateQueue();
+
+    // Debug logs
+    console.log("👥 waitingQueue now:", waitingQueue.map(u => u.email));
+    console.log("📦 inCallUsers:", Array.from(inCallUsers));
+    console.log("📡 userSocketMap:", Array.from(userSocketMap.entries()));
+
     await pairUsers();
   });
-  socket.on("user:call", ({ to, offer }) => {
-    const from = getEmail(socket.id);
+
+  socket.on("user:call", ({ from, to, offer }) => {
+    const from1 = getEmail(socket.id);
     const targetSocket = getSocketId(to);
     if (!from || !targetSocket) {
       console.log("❌ Call blocked: missing from/to");
+      console.log("📞 user:call received", { from, to, offer: !!offer });
       return;
     }
-    // ✅ Protect against calling users in a call
-    if (inCallUsers.has(from) || inCallUsers.has(to)) {
-      console.log(`❌ Call blocked: one of users in call. from=${from}, to=${to}`);
-      return;
-    }
-    console.log("waitingQueue:", waitingQueue);
+
+    // ✅ This is the actual signaling
     console.log(`📞 Proceeding with call: from=${from} to=${to}`);
-
-    io.to(getSocketId(from)).emit("call:timeout", { peer: to });
-    io.to(getSocketId(to)).emit("call:timeout", { peer: from });
-
-    deduplicateQueue();
-    pairUsers();
-
     io.to(targetSocket).emit("incoming:call", { from, offer });
   });
   socket.on("call:accepted", ({ to, ans }) => {
+    console.log("✅ call:accepted received", { to, ans: !!ans });
     const from = getEmail(socket.id);
     const toSocket = getSocketId(to);
 
@@ -1328,47 +1424,43 @@ io.on("connection", socket => {
     io.emit("online:users", Array.from(connectedusers.keys()).map(email => ({ email })));
   });
 
-  socket.on("call:skipped", async ({ from, to }) => {
-    console.log(`⚠️ Call skipped by ${from}, ending call with ${to}`);
+ socket.on("call:skipped", async ({ from, to }) => {
+  console.log(`⚠️ Call skipped by ${from}, ending call with ${to}`);
 
-    // ✅ Proper cleanup
-    inCallUsers.delete(from);
-    inCallUsers.delete(to);
-    connectingUsers.delete(from);
-    connectingUsers.delete(to);
+  // Notify the other user
+  const toSocketId = getSocketId(to);
+  if (toSocketId) {
+    io.to(toSocketId).emit("partner:skipped", { from });
+  }
 
-    const fromSocketId = getSocketId(from);
-    const toSocketId = getSocketId(to);
+  // Cleanup
+  inCallUsers.delete(from);
+  inCallUsers.delete(to);
+  connectingUsers.delete(from);
+  connectingUsers.delete(to);
 
-    // 🧠 Make sure they're back in connected users
-    if (fromSocketId) connectedusers.set(from, fromSocketId);
-    if (toSocketId) connectedusers.set(to, toSocketId);
+  // Only requeue the skipped user
+  const toMeta = userMetaMap.get(to);
+  if (toSocketId && toMeta) {
+    waitingQueue.push({ email: to, socketId: toSocketId, ...toMeta });
+  }
 
-    const fromMeta = userMetaMap.get(from);
-    const toMeta = userMetaMap.get(to);
+  deduplicateQueue();
 
-    if (fromSocketId && fromMeta) {
-      waitingQueue.push({ email: from, socketId: fromSocketId, ...fromMeta });
-    }
-    if (toSocketId && toMeta) {
-      waitingQueue.push({ email: to, socketId: toSocketId, ...toMeta });
-    }
+  // Notify both users their call ended
+  const fromSocketId = getSocketId(from);
+  if (fromSocketId) {
+    io.to(fromSocketId).emit("call:ended", { reason: "skipped", peer: to });
+  }
+  if (toSocketId) {
+    io.to(toSocketId).emit("call:ended", { reason: "skipped", peer: from });
+  }
 
-    deduplicateQueue();
+  console.log("🧹 CLEANUP inCallUsers:", Array.from(inCallUsers));
+  console.log("📥 Queue after skip:", waitingQueue.map(u => u.email));
 
-    if (fromSocketId) {
-      io.to(fromSocketId).emit("call:ended", { reason: "skipped", peer: to });
-    }
-    if (toSocketId) {
-      io.to(toSocketId).emit("call:ended", { reason: "skipped", peer: from });
-    }
-
-    console.log("🧹 CLEANUP inCallUsers:", Array.from(inCallUsers));
-    console.log("📥 Queue after skip:", waitingQueue.map(u => u.email));
-
-    await pairUsers();
-  });
-
+  await pairUsers();
+});
 
 
 
@@ -1381,19 +1473,21 @@ io.on("connection", socket => {
   socket.on("peer:nego:needed", ({ to, offer }) => {
     const targetSocket = getSocketId(to);
     if (targetSocket) io.to(targetSocket).emit("peer:nego:needed", { from: getEmail(socket.id), offer });
+    console.log("🔄 peer:nego:needed", { from: getEmail(socket.id), to, offer: !!offer });
   });
   socket.on("peer:nego:done", ({ to, ans }) => {
     const targetSocket = getSocketId(to);
     if (targetSocket) io.to(targetSocket).emit("peer:nego:final", { ans });
+    console.log("🔁 peer:nego:done", { from: getEmail(socket.id), to, ans: !!ans });
   });
 
 
-  socket.on("partner:skipped", ({ from, to }) => {
-    const targetSocketId = getSocketId(to);
-    if (targetSocketId) {
-      io.to(targetSocketId).emit("partner:skipped", { from, to }); // ✅ works with socket ID
-    }
-  });
+  // socket.on("partner:skipped", ({ from, to }) => {
+  //   const targetSocketId = getSocketId(to);
+  //   if (targetSocketId) {
+  //     io.to(targetSocketId).emit("partner:skipped", { from, to }); // ✅ works with socket ID
+  //   }
+  // });
 
   socket.on("disconnect", () => {
     const email = getEmail(socket.id);
@@ -1412,7 +1506,12 @@ io.on("connection", socket => {
     }
 
     socketEmailMap.delete(socket.id);
-
+    console.log("🧹 Cleaned up:", {
+      email,
+      userSocketMapSize: userSocketMap.size,
+      inCallUsers: Array.from(inCallUsers),
+      waitingQueue: waitingQueue.map(u => u.email),
+    });
     // Notify all clients about updated online users
     io.emit("online:users", Array.from(connectedusers.keys()).map(email => ({ email })));
 
