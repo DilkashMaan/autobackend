@@ -1411,43 +1411,107 @@ io.on("connection", socket => {
     io.emit("online:users", Array.from(connectedusers.keys()).map(email => ({ email })));
   });
 
+  // socket.on("call:skipped", async ({ from, to }) => {
+  //   console.log(`⚠️ Call skipped by ${from}, ending call with ${to}`);
+  //   const now = Date.now();
+  //   let skipData = userSkipCounts.get(from) || { count: 0, lastSkippedAt: 0 };
+
+  //   // Reset skip count if 10 minutes passed since last skip
+  //   if (now - skipData.lastSkippedAt > 10 * 60 * 1000) {
+  //     skipData = { count: 0, lastSkippedAt: now };
+  //   }
+
+  //   skipData.count++;
+  //   skipData.lastSkippedAt = now;
+  //   userSkipCounts.set(from, skipData);
+
+  //   // Emit cooldown event if 5 skips reached
+  //   if (skipData.count === 5) {
+  //     const fromSocketId = getSocketId(from);
+  //     if (fromSocketId) {
+  //       io.to(fromSocketId).emit("skip:disabled", { cooldown: 10 * 60 });
+  //     }
+
+  //     // Optional: block further skipping until cooldown is over
+  //     skipData.cooldownUntil = now + 10 * 60 * 1000;
+  //     userSkipCounts.set(from, skipData);
+  //   }
+
+  //   // Prevent skipping during cooldown
+  //   if (skipData.cooldownUntil && now < skipData.cooldownUntil) {
+  //     console.log(`${from} tried to skip during cooldown.`);
+  //     return;
+  //   }
+
+  //   // Notify the other user
+  //   const toSocketId = getSocketId(to);
+  //   if (toSocketId) {
+  //     io.to(toSocketId).emit("partner:skipped", { from });
+  //   }
+  //   // Cleanup
+  //   inCallUsers.delete(from);
+  //   inCallUsers.delete(to);
+  //   connectingUsers.delete(from);
+  //   connectingUsers.delete(to);
+  //   // Only requeue the skipped user
+  //   const toMeta = userMetaMap.get(to);
+  //   if (toSocketId && toMeta) {
+  //     waitingQueue.push({ email: to, socketId: toSocketId, ...toMeta });
+  //   }
+  //   deduplicateQueue();
+  //   // Notify both users their call ended
+  //   const fromSocketId = getSocketId(from);
+  //   if (fromSocketId) {
+  //     io.to(fromSocketId).emit("call:ended", { reason: "skipped", peer: to });
+  //   }
+  //   if (toSocketId) {
+  //     io.to(toSocketId).emit("call:ended", { reason: "skipped", peer: from });
+  //   }
+  //   console.log("🧹 CLEANUP inCallUsers:", Array.from(inCallUsers));
+  //   console.log("📥 Queue after skip:", waitingQueue.map(u => u.email));
+  //   await pairUsers();
+  // });
+
+
   socket.on("call:skipped", async ({ from, to }) => {
+    const now = Date.now();
+    let skipData = userSkipCounts.get(from) || { count: 0, lastSkippedAt: 0 };
+
+    // Reset skip count if 10 minutes have passed since last skip
+    if (now - skipData.lastSkippedAt > 10 * 60 * 1000) {
+      skipData = { count: 0, lastSkippedAt: now };
+    }
+
+    // If in cooldown period, disable skip
+    if (skipData.cooldownUntil && now < skipData.cooldownUntil) {
+      console.log(`${from} is in cooldown period. Skipping blocked.`);
+      return;
+    }
+
+    // Increment skip count and update timestamp
+    skipData.count++;
+    skipData.lastSkippedAt = now;
+
+    // Perform the actual skip
     console.log(`⚠️ Call skipped by ${from}, ending call with ${to}`);
-    // const now = Date.now();
-    // const skipData = userSkipCounts.get(from) || { count: 0, lastSkippedAt: 0 };
 
-    // if (now - skipData.lastSkippedAt > 10 * 60 * 1000) {
-    //   skipData.count = 0;
-    // }
-
-    // if (skipData.count >= 5) {
-    //   const fromSocketId = getSocketId(from);
-    //   if (fromSocketId) {
-    //     io.to(fromSocketId).emit("skip:disabled", { cooldown: 10 * 60 });
-    //   }
-    //   return;
-    // }
-    // skipData.count++;
-    // skipData.lastSkippedAt = now;
-    // userSkipCounts.set(from, skipData);
-    // console.log(`⏩ ${from} skipped ${to} (${skipData.count} skips)`);
-    // Notify the other user
     const toSocketId = getSocketId(to);
     if (toSocketId) {
       io.to(toSocketId).emit("partner:skipped", { from });
     }
-    // Cleanup
+
     inCallUsers.delete(from);
     inCallUsers.delete(to);
     connectingUsers.delete(from);
     connectingUsers.delete(to);
-    // Only requeue the skipped user
+
     const toMeta = userMetaMap.get(to);
     if (toSocketId && toMeta) {
       waitingQueue.push({ email: to, socketId: toSocketId, ...toMeta });
     }
+
     deduplicateQueue();
-    // Notify both users their call ended
+
     const fromSocketId = getSocketId(from);
     if (fromSocketId) {
       io.to(fromSocketId).emit("call:ended", { reason: "skipped", peer: to });
@@ -1455,11 +1519,23 @@ io.on("connection", socket => {
     if (toSocketId) {
       io.to(toSocketId).emit("call:ended", { reason: "skipped", peer: from });
     }
+
     console.log("🧹 CLEANUP inCallUsers:", Array.from(inCallUsers));
     console.log("📥 Queue after skip:", waitingQueue.map(u => u.email));
+
+    // After skip, check if limit reached
+    if (skipData.count >= 5) {
+      skipData.cooldownUntil = now + 10 * 60 * 1000;
+      if (fromSocketId) {
+        io.to(fromSocketId).emit("skip:disabled", { cooldown: 10 * 60 });
+      }
+      console.log(`🚫 Skip limit reached for ${from}. Cooldown started.`);
+    }
+
+    userSkipCounts.set(from, skipData);
+
     await pairUsers();
   });
-
 
   socket.on("send-message", data => {
     const targetSocket = getSocketId(data.to);
