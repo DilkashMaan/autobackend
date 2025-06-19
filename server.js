@@ -1266,81 +1266,81 @@ const gendersMatch = (a, b) => {
 let isPairing = false;
 
 const pairUsers = async () => {
-    if (isPairing) {
+  if (isPairing) {
     console.log("⏳ Pairing already in progress, skipping this run.");
     return;
   }
   isPairing = true;
-   try {
-  const available = waitingQueue.filter(u => !inCallUsers.has(u.email));
-  console.log("🔍 Available for pairing:", available.map(u => u.email));
+  try {
+    const available = waitingQueue.filter(u => !inCallUsers.has(u.email));
+    console.log("🔍 Available for pairing:", available.map(u => u.email));
 
-  const paired = new Set();
+    const paired = new Set();
 
-  outer: for (let i = 0; i < available.length - 1; i++) {
-    const user1 = available[i];
-    if (paired.has(user1.email)) continue;
+    outer: for (let i = 0; i < available.length - 1; i++) {
+      const user1 = available[i];
+      if (paired.has(user1.email)) continue;
 
-    for (let j = i + 1; j < available.length; j++) {
-      const user2 = available[j];
-      if (paired.has(user2.email)) continue;
+      for (let j = i + 1; j < available.length; j++) {
+        const user2 = available[j];
+        if (paired.has(user2.email)) continue;
 
-      // if (user1.email === lastTriedWith[user2.email]) continue;
+        // if (user1.email === lastTriedWith[user2.email]) continue;
 
-      const canPair = !(await isBlocked(user1.email, user2.email)) && gendersMatch(user1, user2);
-      if (!canPair) continue;
-      const blocked = await isBlocked(user1.email, user2.email);
-      console.log(`🚫 Block check between ${user1.email} and ${user2.email}: ${blocked}`);
+        const canPair = !(await isBlocked(user1.email, user2.email)) && gendersMatch(user1, user2);
+        if (!canPair) continue;
+        const blocked = await isBlocked(user1.email, user2.email);
+        console.log(`🚫 Block check between ${user1.email} and ${user2.email}: ${blocked}`);
 
 
-      const socketId1 = getSocketId(user1.email);
-      const socketId2 = getSocketId(user2.email);
+        const socketId1 = getSocketId(user1.email);
+        const socketId2 = getSocketId(user2.email);
 
-      console.log("🧠 socketId1:", socketId1, "for", user1.email);
-      console.log("🧠 socketId2:", socketId2, "for", user2.email);
+        console.log("🧠 socketId1:", socketId1, "for", user1.email);
+        console.log("🧠 socketId2:", socketId2, "for", user2.email);
 
-      if (!socketId1 || !socketId2) {
-        console.warn("⚠️ Skipping pairing due to missing socketId", { socketId1, socketId2 });
-        continue;
+        if (!socketId1 || !socketId2) {
+          console.warn("⚠️ Skipping pairing due to missing socketId", { socketId1, socketId2 });
+          continue;
+        }
+
+        [user1.email, user2.email].forEach(email => {
+          inCallUsers.add(email);
+          paired.add(email);
+        });
+
+        // ✅ CLEANUP: Remove paired users from the queue
+        waitingQueue = waitingQueue.filter(
+          u => u.email !== user1.email && u.email !== user2.email
+        );
+
+        console.log("🎉 Pairing:", user1.email, user2.email);
+
+        userSocketMap.set(user1.email, user1.socketId);
+        userSocketMap.set(user2.email, user2.socketId);
+        lastTriedWith[user1.email] = user2.email;
+        lastTriedWith[user2.email] = user1.email;
+
+        io.to(socketId1).emit("matched:pair", {
+          peer: user2.email,
+          peerSocketId: socketId2,
+          initiator: true
+        });
+
+        io.to(socketId2).emit("matched:pair", {
+          peer: user1.email,
+          peerSocketId: socketId1,
+          initiator: false
+        });
+
+        continue outer;
       }
-
-      [user1.email, user2.email].forEach(email => {
-        inCallUsers.add(email);
-        paired.add(email);
-      });
-
-      // ✅ CLEANUP: Remove paired users from the queue
-      waitingQueue = waitingQueue.filter(
-        u => u.email !== user1.email && u.email !== user2.email
-      );
-
-      console.log("🎉 Pairing:", user1.email, user2.email);
-
-      userSocketMap.set(user1.email, user1.socketId);
-      userSocketMap.set(user2.email, user2.socketId);
-      lastTriedWith[user1.email] = user2.email;
-      lastTriedWith[user2.email] = user1.email;
-
-      io.to(socketId1).emit("matched:pair", {
-        peer: user2.email,
-        peerSocketId: socketId2,
-        initiator: true
-      });
-
-      io.to(socketId2).emit("matched:pair", {
-        peer: user1.email,
-        peerSocketId: socketId1,
-        initiator: false
-      });
-
-      continue outer;
     }
-  }
 
-  // ✅ Log when no matches were found
-  if (paired.size === 0) {
-    console.log("🔍 No matches found this round.");
-  }
+    // ✅ Log when no matches were found
+    if (paired.size === 0) {
+      console.log("🔍 No matches found this round.");
+    }
   } catch (err) {
     console.error("❌ Error during pairing:", err);
   } finally {
@@ -1438,43 +1438,43 @@ io.on("connection", socket => {
     io.emit("online:users", Array.from(connectedusers.keys()).map(email => ({ email })));
   });
 
- socket.on("call:skipped", async ({ from, to }) => {
-  console.log(`⚠️ Call skipped by ${from}, ending call with ${to}`);
+  socket.on("call:skipped", async ({ from, to }) => {
+    console.log(`⚠️ Call skipped by ${from}, ending call with ${to}`);
 
-  // Notify the other user
-  const toSocketId = getSocketId(to);
-  if (toSocketId) {
-    io.to(toSocketId).emit("partner:skipped", { from });
-  }
+    // Notify the other user
+    const toSocketId = getSocketId(to);
+    if (toSocketId) {
+      io.to(toSocketId).emit("partner:skipped", { from });
+    }
 
-  // Cleanup
-  inCallUsers.delete(from);
-  inCallUsers.delete(to);
-  connectingUsers.delete(from);
-  connectingUsers.delete(to);
+    // Cleanup
+    inCallUsers.delete(from);
+    inCallUsers.delete(to);
+    connectingUsers.delete(from);
+    connectingUsers.delete(to);
 
-  // Only requeue the skipped user
-  const toMeta = userMetaMap.get(to);
-  if (toSocketId && toMeta) {
-    waitingQueue.push({ email: to, socketId: toSocketId, ...toMeta });
-  }
+    // Only requeue the skipped user
+    const toMeta = userMetaMap.get(to);
+    if (toSocketId && toMeta) {
+      waitingQueue.push({ email: to, socketId: toSocketId, ...toMeta });
+    }
 
-  deduplicateQueue();
+    deduplicateQueue();
 
-  // Notify both users their call ended
-  const fromSocketId = getSocketId(from);
-  if (fromSocketId) {
-    io.to(fromSocketId).emit("call:ended", { reason: "skipped", peer: to });
-  }
-  if (toSocketId) {
-    io.to(toSocketId).emit("call:ended", { reason: "skipped", peer: from });
-  }
+    // Notify both users their call ended
+    const fromSocketId = getSocketId(from);
+    if (fromSocketId) {
+      io.to(fromSocketId).emit("call:ended", { reason: "skipped", peer: to });
+    }
+    if (toSocketId) {
+      io.to(toSocketId).emit("call:ended", { reason: "skipped", peer: from });
+    }
 
-  console.log("🧹 CLEANUP inCallUsers:", Array.from(inCallUsers));
-  console.log("📥 Queue after skip:", waitingQueue.map(u => u.email));
+    console.log("🧹 CLEANUP inCallUsers:", Array.from(inCallUsers));
+    console.log("📥 Queue after skip:", waitingQueue.map(u => u.email));
 
-  await pairUsers();
-});
+    await pairUsers();
+  });
 
 
 
@@ -1531,7 +1531,57 @@ io.on("connection", socket => {
 
     pairUsers();
   });
+
+  socket.on("user:disconnected", async ({ from, to }) => {
+    console.log(`🔌 User ${from} manually disconnected from call with ${to}`);
+
+    // 1. Remove the user who clicked disconnect
+    const fromSocketId = getSocketId(from);
+    userSocketMap.delete(from);
+    socketEmailMap.delete(fromSocketId);
+    connectedusers.delete(from);
+    inCallUsers.delete(from);
+    connectingUsers.delete(from);
+    userMetaMap.delete(from);
+    waitingQueue = waitingQueue.filter(u => u.email !== from);
+
+    // 2. Re-add the partner (TO) to queue
+    const toSocketId = getSocketId(to);
+    const toMeta = userMetaMap.get(to);
+    if (toSocketId && toMeta) {
+      inCallUsers.delete(to);
+      connectingUsers.delete(to);
+      waitingQueue.push({ email: to, socketId: toSocketId, ...toMeta });
+    }
+
+    // 3. Notify both users
+    if (fromSocketId) {
+      io.to(fromSocketId).emit("call:ended", { reason: "manual-disconnect", peer: to });
+    }
+    if (toSocketId) {
+      io.to(toSocketId).emit("call:ended", { reason: "manual-disconnect", peer: from });
+      io.to(toSocketId).emit("partner:skipped", { from }); // Reuse existing behavior
+    }
+
+    // 4. Deduplicate and try pairing again
+    deduplicateQueue();
+    await pairUsers();
+
+    console.log("📥 Updated Queue:", waitingQueue.map(u => u.email));
+    console.log("🧹 Cleanup complete for manual disconnect");
+  });
+
+
 });
+
+
+
+setInterval(() => {
+  if (waitingQueue.length > 1) {
+    console.log("🔁 Auto-triggered pairing due to waitingQueue length:", waitingQueue.length);
+    pairUsers();
+  }
+}, 3000);
 // --- Start Server ---
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
