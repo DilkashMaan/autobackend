@@ -1257,11 +1257,7 @@ const isBlocked = async (user1, user2) => {
   );
   return res.rowCount > 0;
 };
-const gendersMatch = (a, b) => {
-  const aOk = a.preference === 'any' || a.preference === b.gender;
-  const bOk = b.preference === 'any' || b.preference === a.gender;
-  return aOk && bOk;
-};
+
 function matchesPreference(userA, userB) {
   return userA.preference === "any" || userA.preference === userB.gender;
 }
@@ -1269,11 +1265,13 @@ function matchesPreference(userA, userB) {
 let isPairing = false;
 
 const pairUsers = async () => {
-  if (isPairing) {
-    console.log("⏳ Pairing already in progress, skipping this run.");
-    return;
-  }
+    if (isPairing) {
+      console.log("⏳ Pairing already in progress, skipping this run.");
+      return;
+    }
+
   isPairing = true;
+  
   try {
     const available = waitingQueue.filter(u => !inCallUsers.has(u.email));
     console.log("🔍 Available for pairing:", available.map(u => u.email));
@@ -1287,40 +1285,59 @@ const pairUsers = async () => {
       for (let j = i + 1; j < available.length; j++) {
         const user2 = available[j];
         if (paired.has(user2.email)) continue;
-        const canPair = !(await isBlocked(user1.email, user2.email)) && matchesPreference(user1, user2) && matchesPreference(user2, user1);
-        if (!canPair) continue;
+
         const blocked = await isBlocked(user1.email, user2.email);
-        console.log(`🚫 Block check between ${user1.email} and ${user2.email}: ${blocked}`);
-        const socketId1 = getSocketId(user1.email);
-        const socketId2 = getSocketId(user2.email);
-        console.log("🧠 socketId1:", socketId1, "for", user1.email);
-        console.log("🧠 socketId2:", socketId2, "for", user2.email);
-        if (!socketId1 || !socketId2) {
-          console.warn("⚠️ Skipping pairing due to missing socketId", { socketId1, socketId2 });
+        if (blocked) {
+          console.log(`🚫 Blocked: ${user1.email} <--> ${user2.email}`);
           continue;
         }
+
+        const canPair =
+          matchesPreference(user1, user2) &&
+          matchesPreference(user2, user1);
+
+        if (!canPair) continue;
+
+        const socketId1 = getSocketId(user1.email);
+        const socketId2 = getSocketId(user2.email);
+
+        if (!socketId1 || !socketId2) {
+          console.warn("⚠️ Skipping pairing due to missing socketId", {
+            socketId1,
+            socketId2,
+          });
+          continue;
+        }
+
         [user1.email, user2.email].forEach(email => {
           inCallUsers.add(email);
           paired.add(email);
         });
+
         waitingQueue = waitingQueue.filter(
           u => u.email !== user1.email && u.email !== user2.email
         );
+
         console.log("🎉 Pairing:", user1.email, user2.email);
+
         userSocketMap.set(user1.email, user1.socketId);
         userSocketMap.set(user2.email, user2.socketId);
+
         lastTriedWith[user1.email] = user2.email;
         lastTriedWith[user2.email] = user1.email;
+
         io.to(socketId1).emit("matched:pair", {
           peer: user2.email,
           peerSocketId: socketId2,
-          initiator: true
+          initiator: true,
         });
+
         io.to(socketId2).emit("matched:pair", {
           peer: user1.email,
           peerSocketId: socketId1,
-          initiator: false
+          initiator: false,
         });
+
         continue outer;
       }
     }
@@ -1342,6 +1359,7 @@ const pairUsers = async () => {
 // --- Socket.IO ---
 io.on("connection", socket => {
   console.log("🔌 Connected:", socket.id);
+
   socket.on("user:online", ({ email }) => {
     console.log("📥 user:online received:", email);
     if (!email) return;
@@ -1350,6 +1368,7 @@ io.on("connection", socket => {
     connectedusers.set(email, socket.id);
     io.emit("online:users", Array.from(connectedusers.keys()).map(email => ({ email })));
     console.log("connectedusers:", connectedusers);
+
     // ✅ Acknowledge so frontend knows when it's safe to emit user:ready
     socket.emit("online:ack");
   });
@@ -1366,6 +1385,9 @@ io.on("connection", socket => {
     console.log("📥 user:ready:", { email, gender, preference });
     // 🔄 Always update user metadata
     userMetaMap.set(email, { gender, preference });
+    const fromMeta = userMetaMap.get(email);
+    console.log("gendererrrrrrrrre", fromMeta)
+
     // 🔄 Always update socketId in queue or add new
     const existingIndex = waitingQueue.findIndex(u => u.email === email);
     if (existingIndex !== -1) {
@@ -1524,12 +1546,21 @@ io.on("connection", socket => {
     console.log("📥 Queue after skip:", waitingQueue.map(u => u.email));
 
     // After skip, check if limit reached
-    if (skipData.count >= 5) {
-      skipData.cooldownUntil = now + 10 * 60 * 1000;
-      if (fromSocketId) {
-        io.to(fromSocketId).emit("skip:disabled", { cooldown: 10 * 60 });
+    const fromMeta = userMetaMap.get(from);
+
+    // Only apply skip limit if not female
+    if (!fromMeta || fromMeta.gender !== "female") {
+      if (skipData.count >= 5) {
+        skipData.cooldownUntil = now + 10 * 60 * 1000;
+        if (fromSocketId) {
+          io.to(fromSocketId).emit("skip:disabled", { cooldown: 10 * 60 });
+        }
+        console.log(`🚫 Skip limit reached for ${from}. Cooldown started.`);
       }
-      console.log(`🚫 Skip limit reached for ${from}. Cooldown started.`);
+    } else {
+      // If female, reset skip count to prevent limit
+      skipData.count = 0;
+      console.log(`🎉 ${from} is female and exempt from skip limit.`);
     }
 
     userSkipCounts.set(from, skipData);
