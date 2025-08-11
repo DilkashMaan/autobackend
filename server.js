@@ -1205,7 +1205,7 @@ app.use(express.json());
 // --- PostgreSQL Setup ---
 const { Pool } = pkg;
 const pool = new Pool({
-  connectionString: "postgresql://dilkash:LLZTQ4MBZOr52aioxpG6FSWStDvCpgV1@dpg-d0un9j3ipnbc73ej7vag-a.oregon-postgres.render.com/videochat_ilcb" || "your-fallback-url",
+  connectionString: "postgresql://dilkash:iPiOBsA0MYI5Kd3ksKokvBVbYdEn83Km@dpg-d2csjgqdbo4c73c33q20-a.oregon-postgres.render.com/videochat_1l5w" || "your-fallback-url",
   ssl: { rejectUnauthorized: false },
 });
 (async () => {
@@ -1265,13 +1265,13 @@ function matchesPreference(userA, userB) {
 let isPairing = false;
 
 const pairUsers = async () => {
-    if (isPairing) {
-      console.log("⏳ Pairing already in progress, skipping this run.");
-      return;
-    }
+  if (isPairing) {
+    console.log("⏳ Pairing already in progress, skipping this run.");
+    return;
+  }
 
   isPairing = true;
-  
+
   try {
     const available = waitingQueue.filter(u => !inCallUsers.has(u.email));
     console.log("🔍 Available for pairing:", available.map(u => u.email));
